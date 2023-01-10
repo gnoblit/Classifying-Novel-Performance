@@ -2,6 +2,9 @@ using Pkg
 Pkg.activate(".")
 using Distributions, StatsBase, Random, Plots
 
+############################ TO DO ##########################
+# Should agent which prefers Accept have any preference for reject? 
+
 # how do novel behaviors become classified? What are the dynamics of even a sequential process whereby individuals are required to approve or disapprove of a novel behavior, and do not want to end up in the minority (some have a private interest in approval, some in disapproval.)
 
 # I don’t see social learning in this context—other than learning about what the sequence of announcements to date is. I’m thinking of just individual decisionmaking—simplest version: across different random orderings (but perhaps always led by one who prefers ‘acceptable’ label for a new action; and then maybe a bias towards those with an interest voicing early views because they have an incentive to influence positions of later agents) what is the optimal decision for each agent in the sequence (approve/disapprove) given an assumed cost to being in the minority once consensus is reached (ie. point at which agents all announce the same thing).  I’m assuming this is a simulation, exploring the impact of varying parameters.  In a sense, this is what Atrisha is looking at—but her version is a bit more complex. We’d be looking at how long it takes consensus to emerge, whether novel behaviors are approved or disapproved based on differing sizes of groups, sequencing, etc.  
@@ -51,7 +54,7 @@ function init(N, minorityCost, randomSeq, propPref, binomialBeliefs)
     if sum(propPref) != 1
         throw("Preference classes do not sum to 1.")
     end
-    # 1. Assign utility to agents
+    # 1. Assign utility for A|A to each agent (Utility of R|R = -U(A|A), a strong pref for A means strong dislikje of R)
     prefs = [Distributions.Uniform(-1, 0), Distributions.Normal(0, 0), Distributions.Uniform(0, 1)] # Three classes of agents - reject (-1,0), unsure (0), approval (0, 1)
     # 2. Populate with N agents
     agents = [Agent(i, rand(StatsBase.wsample(prefs, Weights(propPref)) ), 0, 0.0) for i in 1:N] # ID, preference, NO DECISION YET, NOR UTILITY
@@ -109,8 +112,8 @@ function iterate!(soc::Society)
         # Each agent compares the utility of accepting or rejecting given beliefs which is a coordination game with the majority coalition
         # Utility of stating accept is the preference for accept * prob accept - cost of minority * probability reject (because focal agent stated accept)
         U_A = agent.utilAccept*mode_accept - soc.minorityCost*mode_reject
-        # Utility of stating reject is the preference for reject * prob reject - cost of minority * probability accept (because focal agent stated reject)
-        U_R = (1-agent.utilAccept)*mode_reject - soc.minorityCost*mode_accept
+        # Utility of stating reject is the preference for reject (the negative of utilAccept) * prob reject - cost of minority * probability accept (because focal agent stated reject)
+        U_R = -agent.utilAccept*mode_reject - soc.minorityCost*mode_accept
             
         # Set agent's decision
         agent.decision = ifelse(argmax([U_A, U_R]) == 1, 1, -1) # First is accept then reject, set decision
@@ -164,19 +167,18 @@ end
 """
 
 
-society = init(1000000, .8, false, [0, .5, .5], false)
+society = init(1000000, .8, false, [.1, .5, .4], false)
 v = getfield.(society.agents, :utilAccept)
 mean(v.<0/1000000)
 mean(v.>0/1000000)
 mean(v.==0/1000000)
 g=[]
 for i in 1:2000
-    society = init(30, .8, false , [0, 0, 1.], true)
+    society = init(30, .2, false , [.3, .5, .2], true)
     println(mean(getfield.(society.agents, :utilAccept)))
     iterate!(society)
     push!(g, mean(society.performances))
 end
 print(mean(g))
-histogram(g; bins = -1:.05:1)
+histogram(g; bins = -1.1:.05:1.1)
 print(mean(society.utilities))
-print(mean(getfield.(society.agents, :utilAccept)))
