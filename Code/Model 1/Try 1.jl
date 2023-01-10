@@ -8,40 +8,16 @@ using Distributions, StatsBase, Random
 
 ######
 
-#A group of size n exists. Individuals have opinions on whether new behavior should be classified as norm adhering (1) or norm breaking (0). Individuals near .5 are unsure. Sequence of decision occurs stochastically with earlier individuals having more extreme opinions. Each individual also possesses a prior belief about the proportion of individuals in the group who will present a 1 or a 0. As individuals make statements, this belief gets updated in a Bayesian fashion assuming likelihood is binomial (with Beta prior). Each individual experiences some cost of being in the minority (initially constant). The cost, c, is in the range of 0-1. 
+# A group of size N exists. This group is organized around a classifier which assigns each behavioral performance a 1 or -1 denoting normatively acceptable or not. A new performance has occurred which must be classified. Individuals have opinions on whether new behavior should be classified as norm adhering (1) or norm breaking (-1). Individuals possess preferences over both the outcome and being in a majority. Preferences take the form of the utility of stating accept given that the group ultimately accepts, stating reject given that the group ultimately rejects, and miscoordinating with the group. 
+# The sequence of decision occurs either completely randomly or stochastically whereby agents with more extreme opinions are more likely to state them earlier in the sequence. Agents cannot avoid stating their opinion when it is their turn to do so. As each individual observes the sequence of public statements or performances they update their beliefs that the group will end up picking to either accept or reject the proposal. These beliefs are either binomial (accept reject) or multinomial (acc, rej, unsure, i.e. the number of agents remaining to make their declaration). 
+# Finally, once all agents have made their statements the group selects an outcome. If agents stated accept and the group accepts, they receive utilAccept. If agents stated reject and the group rejects, they receive -utilAccept (i.e., u(R|R)). If agents are in the minority and miscoordinate with the group, they receive -minorityCost. This is a commonly experienced cost regardless of agent's statement (i.e. no difference if agent Accepted and group ultimately Rejects or vice versa). 
 
-#Agents believe decision will be accepted with probability p and rejected with 1-p. 
-
-# Group of size n
-# Individuals make decisions in sequence based on strength of opinion. 
-# They all have an opinion in 0-1(highest) of wanting to see behavior assessed as norm-adhering (1-x is norm-breaking)
-# They all value current equilibrium on range (0-1 (highest)
-# Agents possess multinomial prior and then update on basis of observed individual choices
-# Choosing sequence depends on opinion (highest at extremes)
-# Utility ultimately = opinion*outcome - cost_minority * indicator if in minority
-# Being in minority suggests my classifier is distinct from others - I see the world differently and in other settings I may not be able to coordinate
-
-# More realistic case is if individuals have different ability to impact others' payoffs and different outside options
-
-
-# Novel, unclassified behavior occurs. 
-# Individuals possess preference for outcome. Some proportion want A others want B most are null. A-pref types experience U_A > U_B and B-pref types experience U_B > U_A where U_j denotes utility of outcome j. 
-# Agents state their preferred outcome by combining 1) their preference with 2) an estimate of the minority position
-# Agents also possess some degree of confidence in their preference. Some individuals are completely sure what their payoff would be under their preferred policy. Other individuals are unsure. Those agents who are more confident are more likely to go first in stating their preference. Those agents who are less confident are more likely to hang back.
-# Agents then observe the sequence and re-estimate the proportion of each type before stating their preference optimally. They weigh the benefit of their prefered outcome by the probability of it being implemented vs the cost of being in the minority by the probability of that occurring.  
-    # VERY WEIRD TO HYPOTHESIZE THAT AGENTS DON'T INTERACT OUTSIDE OF CONSENSUS PROCESS OR MAKE STATEMENTS AND CANNOT RENEGE
-
-
-# Ideas
-# What if individuals continue to update. They make statements and these statement impact and individuals can update their statements as they learn about the population
-
-# Perhaps confidence should occur through a locally sampling procedure. Individuals sample locally (could later incorporate network structure of accessible individuals) and use that as their intiial estimate of the proportion of each type and thus what the ultimate minority will be. This does not account for how individuals will impact others in updating process
-
-# Individuals can state their opinion or back down
-# Value of stating opinion depends on whether ultimately in minority or not. If in the minority, net cost. If not, positive.
-# Additional value from outcome of group. Some individuals actually prefer Normative acceptance vs. norm breaking. Need some preference ordering: V(Norm-Adh); V(Norm-Break); V(Minority)
-# Everyone has preference ordering over norm adhering or breaking. For some individuals, the cost of being in the minority is higher than their valuation of either outcome? 
-# Variable cost to being in minority? And some proportion of individuals will always want to state their opinion
+######
+# Future Ideas
+# 1. Agents experience heterogenous costs to being in minority (some individuals don't care)
+# 2. Endogenize cost to being in the minority. Would need to think what is actually at cost and how that would vary among individuals.
+# 3. Individuals possess distinct prior probabilities. While they receive common signal, their initial decisions will be distinct.
+# 4. Should individuals be able to change their opinions after they've made a statement?
 
 mutable struct Agent
     id::Int16                   # Identifier
