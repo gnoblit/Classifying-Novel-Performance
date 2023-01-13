@@ -3,7 +3,8 @@ Pkg.activate(".")
 using Distributions, StatsBase, Random, Plots
 
 ############################ TO DO ##########################
-# Should agent which prefers Accept have any preference for reject? 
+# Should agent which prefers Accept have any/negative preference for reject? Makes sense to me 
+# Should agents choose when to speak? Can play a dynamic game. 
 
 # how do novel behaviors become classified? What are the dynamics of even a sequential process whereby individuals are required to approve or disapprove of a novel behavior, and do not want to end up in the minority (some have a private interest in approval, some in disapproval.)
 
@@ -38,7 +39,7 @@ mutable struct Society
     propPref::Vector{Float16}                       # Proportion of accept, unsure, reject
     minorityCost::Float16                           # Cost to being in minority ultimately
     binomialBeliefs::Bool                           # True if agents have binomial beliefs, false if agents have multinomial
-    sharedBeliefs::Vector{Int32}                    # Distribution of beliefs defined by parameters
+    sharedBeliefs::Vector{Int32}                    # Distribution of beliefs defined by parameters a [1], b [2]
     time::Int32                                     # Time step counter
 end
 
@@ -99,7 +100,7 @@ function iterate!(soc::Society)
 
         # Get parameters
         a = soc.sharedBeliefs[1] # Number accepts
-        b = soc.sharedBeliefs[2]# Number rejects
+        b = soc.sharedBeliefs[2] # Number rejects
         # First check if previous performances and nature of beliefs - binomial or not
         if soc.binomialBeliefs
             mode_accept = ifelse(a > 1 && b > 1, (a-1)/(a+b-2), 1/2)
@@ -121,7 +122,7 @@ function iterate!(soc::Society)
         # 2. Append statement to public sequence and update beliefs
         push!(soc.performances, agent.decision) # Append to array
 
-        # 4. Update sharedBeliefs
+        # 3. Update sharedBeliefs
 
         if agent.decision == 1                      # If agent accepted then add to α spot
             soc.sharedBeliefs[1] += 1
