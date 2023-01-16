@@ -2,6 +2,15 @@ using Pkg
 Pkg.activate(".")
 using Distributions, StatsBase, Random, Plots
 
+############################ Key Assumptions ###################
+# Individuals start with shared uniform distribution over proportions of accept/reject
+# Individuals receive common signal from vector of performances
+# Individuals have symmetrical preferences over accept and reject. Strong accept|accept preference = strong and opposite in sign R|R preference
+# No individual heterogeneity in terms of the cost of being in the minority
+# Three preference classes exist: Prefer R|R (uniform from -1 to 0), Prefer A|A (uniform from 0 to 1) and unsure (U(A|A) = U(R|R) = 0)
+#       Why not distributed normally within each class?    
+# Sequence of statements is fixed and exogenous. Individuals MUST state, cannot hide their statement. 
+# Use mode of posterior not mean
 ############################ TO DO ##########################
 # Should agent which prefers Accept have any/negative preference for reject? Makes sense to me 
 # Should agents choose when to speak? Can play a dynamic game. 
@@ -25,7 +34,7 @@ using Distributions, StatsBase, Random, Plots
 mutable struct Agent
     id::Int32                   # Identifier
     utilAccept::Float16         # Utility of A|A ∈ (-1, 1) where 0 denotes ambiguouity or unsure, -1 denotes normatively unacceptable; 1 denotes normatively acceptable. 
-                                # Values on either side of zero denote weaker directional preferences. 
+                                # Values closer to zero denote weaker directional preferences. A 0 means you get no utility from accept|A or R|R and you only care about avoiding minority. 
     decision::Int               # What does agent ultimately state: 1 = accept, 2 = reject
     utility::Float16            # Final utility of agent
 end
@@ -38,7 +47,8 @@ mutable struct Society
     randomSeq::Bool                                 # True if random sequence of statements otherwise false
     propPref::Vector{Float16}                       # Proportion of accept, unsure, reject
     minorityCost::Float16                           # Cost to being in minority ultimately
-    binomialBeliefs::Bool                           # True if agents have binomial beliefs, false if agents have multinomial
+    binomialBeliefs::Bool                           # True if agents have binomial beliefs, 
+                                                    # false if agents have multinomial
     sharedBeliefs::Vector{Int32}                    # Distribution of beliefs defined by parameters a [1], b [2]
     time::Int32                                     # Time step counter
 end
@@ -51,14 +61,16 @@ end
     4. Assigns initial beliefs: Beta if true and Dirichelt (multinomial) if false. 
 """
 function init(N, minorityCost, randomSeq, propPref, binomialBeliefs)
-
     if sum(propPref) != 1
         throw("Preference classes do not sum to 1.")
     end
-    # 1. Assign utility for A|A to each agent (Utility of R|R = -U(A|A), a strong pref for A means strong dislikje of R)
+
+    # 1. Assign utility for A|A to each agent (Utility of R|R = -U(A|A), a strong pref for A means strong dislike of R)
     prefs = [Distributions.Uniform(-1, 0), Distributions.Normal(0, 0), Distributions.Uniform(0, 1)] # Three classes of agents - reject (-1,0), unsure (0), approval (0, 1)
+    
     # 2. Populate with N agents
     agents = [Agent(i, rand(StatsBase.wsample(prefs, Weights(propPref)) ), 0, 0.0) for i in 1:N] # ID, preference, NO DECISION YET, NOR UTILITY
+    
     # 3. Initialize sequence of performances
     utilsTransformed = abs.(getfield.(agents, :utilAccept)) .+ .001 # Calculate distance from 0 with small amount added to permit sampling of unsure individuals
     if randomSeq # Sequence is random
@@ -66,7 +78,8 @@ function init(N, minorityCost, randomSeq, propPref, binomialBeliefs)
     else # Sequence is non-random but order is ∝ magnitude of preference over outcomes.
         agents = StatsBase.wsample(agents, Weights(utilsTransformed./sum(utilsTransformed)), N, replace = false)
     end
-    # 4. Initial beliefs
+    
+    # 4. Initialize beliefs as a uniform distribution of some sort
     # If beliefs are binomial, prior is beta on proportion of accept, else beliefs are multinomial and prior is Dirichlet
     sharedBeliefs = ifelse(binomialBeliefs, [1,1], [1,1,1]) # No prior knowledge, no sampling
     
