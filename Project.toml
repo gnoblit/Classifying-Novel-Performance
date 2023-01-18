@@ -1,5 +1,8 @@
 [deps]
 ConjugatePriors = "1624bea9-42b1-5fc1-afd3-e96f729c8d6c"
+DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
 Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
 GR = "28b8d3ca-fb5f-59d9-8090-bfdbd6d07a71"
+SQLite = "0aa819cd-b072-5ff4-a722-6bc24af294d9"
 StatsBase = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
+Tables = "bd369af6-aec1-5ad0-b16a-f7cc5008161c"

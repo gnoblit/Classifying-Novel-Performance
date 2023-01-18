@@ -1,6 +1,6 @@
 using Pkg
 Pkg.activate(".")
-using Distributions, StatsBase, Random, Plots
+using Distributions, StatsBase, Random, Plots, DataFrames, Tables, SQLite
 
 ############################ Key Assumptions ###################
 # Individuals start with shared uniform distribution over proportions of accept/reject
@@ -11,6 +11,7 @@ using Distributions, StatsBase, Random, Plots
 #       Why not distributed normally within each class?    
 # Sequence of statements is fixed and exogenous. Individuals MUST state, cannot hide their statement. 
 # Use mode of posterior not mean
+# If agents have identical utilites to A|A and R|R, pick whichever their true preference is (idea being that they understand possibility they might influence others)
 ############################ TO DO ##########################
 # Should agent which prefers Accept have any/negative preference for reject? Makes sense to me 
 # Should agents choose when to speak? Can play a dynamic game. 
@@ -32,7 +33,7 @@ using Distributions, StatsBase, Random, Plots
 # 4. Should individuals be able to change their opinions after they've made a statement?
 
 mutable struct Agent
-    id::Int32                   # Identifier
+    id::Int64                   # Identifier
     utilAccept::Float16         # Utility of A|A ∈ (-1, 1) where 0 denotes ambiguouity or unsure, -1 denotes normatively unacceptable; 1 denotes normatively acceptable. 
                                 # Values closer to zero denote weaker directional preferences. A 0 means you get no utility from accept|A or R|R and you only care about avoiding minority. 
     decision::Int               # What does agent ultimately state: 1 = accept, 2 = reject
@@ -40,17 +41,16 @@ mutable struct Agent
 end
 
 mutable struct Society
-    N::Int32                                        # Number of individuals in group
+    N::Int64                                        # Number of individuals in group
     agents::Vector{Agent}                           # Vector of all Agents
     utilities::Vector{Float16}                      # Vector of utilities that agents incur
-    performances::Vector{Int32}                     # Vector of stated performances (1 = Accept, -1 = Reject)
+    performances::Vector{Int64}                     # Vector of stated performances (1 = Accept, -1 = Reject)
     randomSeq::Bool                                 # True if random sequence of statements otherwise false
     propPref::Vector{Float16}                       # Proportion of accept, unsure, reject
     minorityCost::Float16                           # Cost to being in minority ultimately
     binomialBeliefs::Bool                           # True if agents have binomial beliefs, 
                                                     # false if agents have multinomial
-    sharedBeliefs::Vector{Int32}                    # Distribution of beliefs defined by parameters a [1], b [2]
-    time::Int32                                     # Time step counter
+    sharedBeliefs::Vector{Int64}                    # Distribution of beliefs defined by parameters a [1], b [2]
 end
 
 """ Function initializes Society
@@ -82,14 +82,11 @@ function init(N, minorityCost, randomSeq, propPref, binomialBeliefs)
     # 4. Initialize beliefs as a uniform distribution of some sort
     # If beliefs are binomial, prior is beta on proportion of accept, else beliefs are multinomial and prior is Dirichlet
     sharedBeliefs = ifelse(binomialBeliefs, [1,1], [1,1,1]) # No prior knowledge, no sampling
-    
-    # Set initial time-step
-    time = 1
 
     # Assign empty vectors
     utilities = []
     performances = []
-    return Society(N, agents, utilities, performances, randomSeq, propPref, minorityCost, binomialBeliefs, sharedBeliefs, time)
+    return Society(N, agents, utilities, performances, randomSeq, propPref, minorityCost, binomialBeliefs, sharedBeliefs)
 end
 
 """
@@ -102,16 +99,17 @@ end
             Utility of accept = p_A*u_A^i + (1-p_A)(-c): If I state accept then with probability group will accept I get utilAccept (u_A^i). With 1-p_A I miscoordinate and am in the minority, getting -c
             Utility of reject = p_A*(-c) + (1-p_A)(-u_A^i): If I state reject then with probability (1-p_A) the group will also reject I get -utilAccept (-u_A^i). With p_A I miscoordinate and am in the minority (I stated reject but group stated accept), getting -c
     2. Append statement to public sequence & update beliefs
-    3. Increase time counter
+    3. Append to dataframe
     4. Assign utility
 """
 function iterate!(soc::Society)
+    df = DataFrame(Agent = Int64[], AlphaBefore = Int64[], BetaBefore = Int64[], uAA = Float16[], statement = Int64[] , AlphaAfter = Int64[], BetaAfter = Int64[])
     # Iterate through agents
     for agent in soc.agents
 
         # 1. Decision contingency
 
-        # Get parameters
+        # Get parameters defining belief
         a = soc.sharedBeliefs[1] # Number accepts
         b = soc.sharedBeliefs[2] # Number rejects
         # First check if previous performances and nature of beliefs - binomial or not
@@ -130,8 +128,11 @@ function iterate!(soc::Society)
         U_R = -agent.utilAccept*mode_reject - soc.minorityCost*mode_accept
             
         # Set agent's decision
-        agent.decision = ifelse(argmax([U_A, U_R]) == 1, 1, -1) # First is accept then reject, set decision
-
+        if U_A != U_R
+            agent.decision = ifelse(argmax([U_A, U_R]) == 1, 1, -1) # First is accept then reject, set decision
+        else
+            agent.decision = ifelse(argmax([agent.utilAccept, -agent.utilAccept]) == 1, 1, -1) # If utilities of each action are same, pick A if UAA higher than URR. Idea here is that agents have some idea they're trying to persuade. 
+        end
         # 2. Append statement to public sequence and update beliefs
         push!(soc.performances, agent.decision) # Append to array
 
@@ -147,8 +148,8 @@ function iterate!(soc::Society)
             soc.sharedBeliefs[3] -= 1
         end
         
-        # Increase counter
-        soc.time += 1
+        # 3. Fill in Df with agent ID, AlphaBefore, BetaBefore, utilAccept, decision, AlphaAfter, BetaAfter
+        push!(df, Dict(:Agent => agent.id, :AlphaBefore => a, :BetaBefore => b, :uAA => agent.utilAccept, :statement => agent.decision, :AlphaAfter => soc.sharedBeliefs[1], :BetaAfter => soc.sharedBeliefs[2]))
     end
     
     # 4. Assign utility
@@ -174,21 +175,61 @@ function iterate!(soc::Society)
 
     # Transfer agents' utilities to easily accessible vector
     soc.utilities = getfield.(soc.agents, :utility) 
+
+    # Return data frame
+    return df
 end
 
 """
-    Function initializes a society and runs Universe times (independent universes)
+    Function initializes a society and runs gen times (independent universes), storing the simulation in an SQLdatabase.
+    Must provide
+        gens                INT                 Number of universes that should be run
+        N                   INT                 Size of communities
+        minorityCost        FLT                 Cost of being in the minority
+        randomSeq           BOOL                true if random sequence, false if sequence prop to magnitude of pref
+        propPref            ARR                 Proportion of society with preferences rejecting, unsure, and accepting
+        binomialBeliefs     BOOL                true if binomial beliefs else multinomial
+        dbName              TXT                 Name of table inside of database
+
+    DB Stored values are: gen (INTEGER & primary key), agent (INTEGER and effectively time variable defined by sequence of choice), alpha & beta values (INTEGERS), prior (REAL) denoting alpha/(alpha + beta) prior, uAA (REAL the utility of A|A), uRR (REAL the utility of R|R), statement (INTEGER, 1 or -1 denoting what agent stated)
+    
+    Final database gives generation columns of sequences of 1) priors, 2) statements, 3) utilities (of agents)
 """
+function run(gens, N, minorityCost, randomSeq, propPref, binomialBeliefs, tableName)
+    
+    db = SQLite.DB("Sim Data/SimulationDB.db")
 
+    # CREATE TABLE I don't think I need this using DataFrames
+    #SQLite.createtable!(db, "$tableName", 
+    #    Tables.Schema((:Gen, :Agent, :AlphaBefore, :BetaBefore, :uAA, :statement, :AlphaAfter, :BetaAfter), 
+    #        (Int64, Int64, Int64, Int64, Float16, Int64, Int64, Int64)))
+    
+    df = DataFrame()
+    for genIter in 1:gens
+        society = init(N, minorityCost, randomSeq, propPref, binomialBeliefs)
+        gen_df = iterate!(society) # returns data base
+        gen_df.Gen .= genIter # Stack generation number
 
-society = init(1000000, .8, false, [.1, .5, .4], false)
+        append!(df, gen_df) # Append to df
+    end
+    
+    # Convert to sql table
+    SQLite.load!(df, db, "$tableName")
+    return df
+end
+
+society = init(20, .8, false, [.3, .4, .3], false)
+test = iterate!(society)
+
+test = run(3, 20, 1.7, false, [.3, .4, .3], true, "test2")
+
 v = getfield.(society.agents, :utilAccept)
 mean(v.<0/1000000)
 mean(v.>0/1000000)
 mean(v.==0/1000000)
 g=[]
 for i in 1:2000
-    society = init(30, .2, false , [.3, .5, .2], true)
+    society = init(20, .2, false , [.3, .5, .2], true)
     println(mean(getfield.(society.agents, :utilAccept)))
     iterate!(society)
     push!(g, mean(society.performances))
@@ -196,3 +237,4 @@ end
 print(mean(g))
 histogram(g; bins = -1.1:.05:1.1)
 print(mean(society.utilities))
+
