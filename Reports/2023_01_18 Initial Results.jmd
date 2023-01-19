@@ -1,0 +1,165 @@
+---
+title: Classifying Novel Performances
+author: Graham Alexander Noblit
+date: January 18th, 2023
+---
+```julia; echo = false; results = "hidden"
+include("../Code/Model 1/Try 1.jl")
+using Weave, Plots
+```
+
+# Model setup
+
+* Group of size $N$
+* Unclassified behavior occurred that group needs to classify as normative ($1$) or norm-breaking ($-1$).
+* Agents have the opportunity to publicly state whether they think the group should **Accept** or **Reject**. This is all they have control over. 
+* Majority rule ultimately decides how group will classify the novel performance.
+* Agents possess preference over three things:
+    + U(A|A), the utility of stating Accept given that the group ultimately accepts
+    + U(R|R), the utility of stating Reject given that the group ultimately accepts
+    + U(A|R) = U(R|A), the utility of stating Accept when the group Rejects and vice versa. 
+        + = $c$
+        + Homogenous cost for all individuals in group
+* Group is defined by individuals being drawn from three "cohorts":
+    + **Do-s**: U(A|A) > U(R|R); U(A|A) drawn from a uniform distribution defined for (0,1) 
+    + **Don't-s**: U(R|R) > U(A|A); U(R|R) drawn from a uniform distribution defined for (-1,0)
+    + **Unsures**: U(A|A) = U(R|R) = 0
+* Because it is a yes/no outcome, I define U(R|R) as the negative of U(A|A). A **Do**, indexed by $i$, has U(A|A)^i = $.8$ means their preference for U(R|R), U(R|R)^i = $-.8$. Verbally, a strong preference for A|A means a strong dislike for R|R. If I *really* want something to happen then I also *really* don't want the thing to not happen.
+* Individuals do not choose WHEN they make their decisions. That occurs either randomly (all individuals have equal probability of position in sequence) or in proportion to the magnitude of one's preference (Individuals with utilities closer to $1$ or $-1$ are more likely to state their opinion first and individausl with preferences near $0$ are more likely to wait till the end of the decision sequence.
+    + Attempts to model that unsure individuals are mostly concerned about coordinating with group, which means they want to learn what the group will coordinate on.
+    + There is no information revelation. Individuals with $0$ preference always have $0$ preference. Nothing other individuals could say convinces them one of the options is better. 
+* When it is an agent's turn they must decide between stating **Accept** or **Reject**, argmax over the utility of each:
+    + The utility of **Accept** is defined as: pU(A|A) - (1-p)c
+    + The utility of **Reject** is defined as: (1-p)U(R|R) - pc
+    + If utilities are identical, agents select their more positive true preference if they have it, the idea being that they understand they may influence later decision-makers.
+    + If utilities are identical and agents have no true preference (they're in the UNSURE class), they select randomly. 
+* p denotes the agent's belief that the group will ultimately come to **Accept** the performance as normatively-acceptible. (1-p) is the probability it will be rejected. These beliefs are essentially the proportion of the group stating **Accept**
+    + Beliefs start with a uniform beta prior, across all individuals. This distribution is then sequentially updated as each agent makes a statement in sequence. 
+
+# Results
+
+## Effect of Random vs. Opinion-Proportionate Sequence ordering
+
+When $n$ is small, the effect of randomizing vs. preference-magnitude proportionate ordering seems minimal:
+
+```julia; echo = false; dpi = 500; fig_cap = "Each society consists of 30 individuals with a [.3, .5, .2] preference proportions (DONTs, UNSUREs, DOs) where the sequences is RANDOM or PROPORTIONAL TO PREFERENCE MAGNITUDE. Each society is run independently 5,000 times. A majority above .5 indicates ACCEPT was the final majority; below indicates REJECT."
+
+
+bools = [true, false]
+boolDict = Dict()
+for bool in bools # For each cost
+    maj = [] # Construct output vector
+    for iter in 1:5000 # 5 000 universes
+        # Initialize society
+        society = init(30, .5, bool , [.3, .5, .2], true)
+        # Iterate
+        iterate!(society)
+        # Store majority in maj array
+        push!(maj, mean(society.performances.==1))
+    end
+    # Assing maj vector to costDict for processing
+    boolDict[bool] = maj
+end
+
+randPlot1 = histogram(boolDict[true]; bins = -.1:.01:1.1,
+    title = "\n\n\n\nRandom", label = "", color = :orange,
+    alpha = .4, 
+    normalize = :probability)
+vline!(randPlot1, [median(boolDict[true])], color = :orange, linewidth = 4, label = "Median")
+
+randPlot2 = histogram(boolDict[false]; bins = -.1:.01:1.1,
+    title = "Preference-Magnitude Proportionate", label = "", 
+    alpha = .9,
+    normalize = :probability)
+vline!(randPlot2, [median(boolDict[false])], color = :blue, linewidth = 4, label = "Median")
+plot(randPlot1, randPlot2, layout = (2,1), plot_title = "Random Sequence \nvs.\n Proportionate to Magnitude of Preferences", titlefontsize = 10)
+```
+
+When $n$ is large however, the impact is significant. 
+```julia; echo = false; dpi = 500; fig_cap = "Now each society consists of 300 individuals with a [.3, .5, .2] preference proportions (DONTs, UNSUREs, DOs) where the sequences is RANDOM or PROPORTIONAL TO PREFERENCE MAGNITUDE. Each society is run independently 5,000 times. A majority above .5 indicates ACCEPT was the final majority; below indicates REJECT."
+
+
+bools = [true, false]
+boolDict = Dict()
+for bool in bools # For each cost
+    maj = [] # Construct output vector
+    for iter in 1:5000 # 5 000 universes
+        # Initialize society
+        society = init(300, .5, bool , [.3, .5, .2], true)
+        # Iterate
+        iterate!(society)
+        # Store majority in maj array
+        push!(maj, mean(society.performances.==1))
+    end
+    # Assing maj vector to costDict for processing
+    boolDict[bool] = maj
+end
+
+randPlot1 = histogram(boolDict[true]; bins = -.01:.01:1.,
+    title = "\nRandom", label = "", color = :orange,
+    alpha = .4, 
+    normalize = :probability)
+vline!(randPlot1, [median(boolDict[true])], color = :orange, linewidth = 4, label = "Median")
+
+randPlot2 = histogram(boolDict[false]; bins = -.01:.01:1.,
+    title = "Preference-Magnitude Proportionate", label = "", 
+    alpha = .9,
+    normalize = :probability)
+vline!(randPlot2, [median(boolDict[false])], color = :blue, linewidth = 4, label = "Median")
+plot(randPlot1, randPlot2, layout = (2,1), plot_title = "N = 300", titlefontsize = 10)
+```
+
+## Effect of Varying Minority-cost
+
+We can identify analytically when U(A) > U(R) for individual i:
+
+$U(A) = pU(A|A)- (1-p)c$
+
+$U(R) = (1-p)U(R|R) - pc$ where U(R|R) = -U(A|A) for individual i
+
+$U(A) > U(R)$ iff $U(A|A) > c(1-2p)$ for individual i
+
+### Graphs
+
+```julia; echo = false; dpi = 500; fig_cap = "Each society consists of 30 individuals with a [.3, .5, .2] preference proportions (DONTs, UNSUREs, DOs) with costs drawn from [.2, .5, 1., 1.5, 2.]. Each society is run independently 1,000 times. A majority above .5 indicates ACCEPT was the final majority; below indicates REJECT. Median values for each cost are shown by points on the x-axis."
+costs = [.1, .7,  1.5]
+costDict = Dict()
+for cost in costs # For each cost
+    maj = [] # Construct output vector
+    if length(maj) != 0
+        print(maj)
+    end
+
+    for iter in 1:1000 # 10 000 universes
+        # Initialize society
+        society = init(30, cost, false , [.3, .5, .2], true)
+        # Iterate
+        iterate!(society)
+        # Store majority in maj array
+        push!(maj, mean(society.performances.==1))
+    end
+    # Assing maj vector to costDict for processing
+    costDict[cost] = maj
+end
+
+
+plot1 = histogram(costDict[.1]; bins = -.1:.01:1.1, 
+    label = "c = .1", color = :orange, fillalpha = .8, 
+    title = "\nN = 30, Preference props = [.3, .5, .2], Preference-Proportionate Sequence", titlefontsize = 10
+    )
+plot2 = histogram(costDict[.1]; bins = -.1:.01:1.1, 
+    label = "c = .1", color = :orange, fillalpha = .8, 
+    legend_position = :inside)
+histogram!(plot1, costDict[.7]; bins = -.1:.01:1.1, label = "c = .7", color = :blue, fillalpha = .4)
+histogram!(plot2, costDict[1.5]; bins = -.1:.01:1.1, label = "c = 1.5", color = :red, fillalpha = .7)
+
+scatter!(plot1, (median(costDict[.1]), 0), color = :orange, label = "Median c = .1", markersize = 7, markershape = :utriangle, markeralpha = .8 )
+scatter!(plot1, (median(costDict[.7]), 0), color = :blue, label = "Median c = .7", markersize = 7, markershape = :diamond, markeralpha = .8  )
+
+scatter!(plot2, (median(costDict[.1]), 0), color = :orange, label = "Median c = .1", markersize = 7, markershape = :utriangle, markeralpha = .8)
+scatter!(plot2, (median(costDict[1.5]), 0), color = :red, label = "Median c = 1.5", markersize = 7, markershape = :diamond, markeralpha = .7)
+
+plot( plot1, plot2, layout = (2,1), plot_title = "Effect of Varying Minority Cost", topmargin=2Plots.mm)
+
+```
+
