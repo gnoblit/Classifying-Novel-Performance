@@ -38,6 +38,111 @@ using Weave, Plots
 
 # Results
 
+
+## Effect of Group Size
+
+```julia; echo = false; dpi = 500; fig_cap = "Each society is defined by a [.3, .5, .2] preference proportions (DONTs, UNSUREs, DOs) with group size, N, drawn from [15, 60, 120, 240]. Each society is run independently 3,000 times. A majority above .5 indicates ACCEPT was the final majority; below indicates REJECT. Mean values for each set of universes are shown by the black dotted lines. In all cases, agents' ordering of statements is proportionate to the magnitude of their preferences."
+Ns = [15, 60, 120, 240]
+NDict = Dict()
+for N in Ns # For each cost
+    maj = [] # Construct output vector
+
+    for iter in 1:3000 # 10 000 universes
+        # Initialize society
+        society = init(N, .5, false , [.3, .5, .2], true)
+        # Iterate
+        iterate!(society)
+        # Store majority in maj array
+        push!(maj, mean(society.performances.==1))
+    end
+    # Assing maj vector to costDict for processing
+    NDict[N] = maj
+end
+plot1 = histogram(NDict[15]; bins = -.1:.01:1.1, 
+    label = "N = 15", color = :orange, fillalpha = .8, legend_position = :outerleft, 
+    title = "\nminorityCost = .5, Preference props = [.3, .5, .2], Pref-Prop Seq", titlefontsize = 10, 
+    normalize = :probability
+    )
+vline!(plot1, [mean(NDict[15])], label = "Mean", linestyle = :dot, color = :black, linewidth = 5)
+vline!(plot1, [median(NDict[15])], label = "Median", color = :black, linewidth = 5)
+vline!(plot1, [mean(NDict[15] .< .5)], label = "Mass Reject", color = :gold, linewidth = 5)
+
+plot2 = histogram(NDict[60]; bins = -.1:.01:1.1, 
+    label = "N = 60", color = :orange, fillalpha = .8, 
+    legend_position = :outerleft, 
+    normalize = :probability)
+vline!(plot2, [mean(NDict[60])], label = "Mean", linestyle = :dot, color = :black, linewidth = 5)
+vline!(plot2, [median(NDict[60])], label = "Median", color = :black, linewidth = 5)
+vline!(plot2, [mean(NDict[60] .< .5)], label = "Mass Reject", color = :gold, linewidth = 5)
+
+plot3 = histogram(NDict[120]; bins = -.1:.01:1.1, 
+    label = "N = 120", color = :orange, fillalpha = .8, 
+    legend_position = :outerleft, 
+    normalize = :probability)
+vline!(plot3, [mean(NDict[120])], label = "Mean", linestyle = :dot, color = :black, linewidth = 5)
+vline!(plot3, [median(NDict[120])], label = "Median", color = :black, linewidth = 5)
+vline!(plot3, [mean(NDict[120] .< .5)], label = "Mass Reject", color = :gold, linewidth = 5)
+
+plot4 = histogram(NDict[240]; bins = -.1:.01:1.1, 
+    label = "N = 240", color = :orange, fillalpha = .8, 
+    legend_position = :outerleft, 
+    normalize = :probability)
+vline!(plot4, [mean(NDict[240])], label = "Mean", linestyle = :dot, color = :black, linewidth = 5)
+vline!(plot4, [median(NDict[240])], label = "Median", color = :black, linewidth = 5)
+vline!(plot4, [mean(NDict[240] .< .5)], label = "Mass Reject", color = :gold, linewidth = 5)
+
+plot( plot1, plot2, plot3, plot4, layout = (4,1), plot_title = "Effect of Varying Group Size", topmargin=4Plots.mm,
+    size = (650, 600))
+```
+
+
+```julia; echo = false; dpi = 500; fig_cap = "Each society is defined by a [.3, .5, .2] preference proportions (DONTs, UNSUREs, DOs) with group size, N, drawn from [15, 60, 120, 240]. Each society is run independently 3,000 times. A majority above .5 indicates ACCEPT was the final majority; below indicates REJECT. Mean values for each set of universes are shown by the black dotted lines. In all cases, agents' ordering of statements is random."
+Ns = [15, 60, 120, 240]
+NDict = Dict()
+for N in Ns # For each cost
+    maj = [] # Construct output vector
+
+    for iter in 1:3000 # 10 000 universes
+        # Initialize society
+        society = init(N, .5, true , [.3, .5, .2], true)
+        # Iterate
+        iterate!(society)
+        # Store majority in maj array
+        push!(maj, mean(society.performances.==1))
+    end
+    # Assing maj vector to costDict for processing
+    NDict[N] = maj
+end
+
+plot1 = histogram(NDict[15]; bins = -.1:.01:1.1, 
+    label = "N = 15", color = :red, fillalpha = .8, legend_position = :outerleft,
+    title = "\nminorityCost = .5, Preference props = [.3, .5, .2], Random Seq", titlefontsize = 10, 
+    normalize = :probability
+    )
+vline!(plot1, [mean(NDict[15])], label = "Mean", linestyle = :dot, color = :black, linewidth = 5)
+vline!(plot1, [median(NDict[15])], label = "Median", color = :black, linewidth = 5)
+vline!(plot1, [mean(NDict[15] .< .5)], label = "Mass Reject", color = :gold, linewidth = 5)
+
+plot2 = histogram(NDict[60]; bins = -.1:.01:1.1, 
+    label = "N = 60", color = :red, fillalpha = .8, 
+    normalize = :probability, legend_position = :outerleft)
+vline!(plot2, [mean(NDict[60])], label = "Mean", linestyle = :dot, color = :black, linewidth = 5)
+vline!(plot2, [median(NDict[60])], label = "Median", color = :black, linewidth = 5)
+vline!(plot2, [mean(NDict[60] .< .5)], label = "Mass Reject", color = :gold, linewidth = 5)
+
+plot3 = histogram(NDict[240]; bins = -.1:.01:1.1, 
+    label = "N = 240", color = :red, fillalpha = .8, 
+    normalize = :probability, legend_position = :outerleft)
+vline!(plot3, [mean(NDict[240])], label = "Mean", linestyle = :dot, color = :black, linewidth = 5)
+vline!(plot3, [median(NDict[240])], label = "Median", color = :black, linewidth = 5)
+vline!(plot3, [mean(NDict[240] .< .5)], label = "Mass Reject", color = :gold, linewidth = 5)
+
+
+plot( plot1, plot2, plot3, layout = (3,1), plot_title = "Effect of Varying Group Size", topmargin=2Plots.mm, size = (650,600))
+
+```
+
+
 ## Effect of Random vs. Opinion-Proportionate Sequence ordering
 
 When $n$ is small, the effect of randomizing vs. preference-magnitude proportionate ordering seems minimal:
@@ -66,18 +171,22 @@ randPlot1 = histogram(boolDict[true]; bins = -.1:.01:1.1,
     alpha = .4, 
     normalize = :probability)
 vline!(randPlot1, [median(boolDict[true])], color = :orange, linewidth = 4, label = "Median")
+vline!(randPlot1, [mean(boolDict[true])], color = :orange, linestyle = :dot, linewidth = 4, label = "Mean")
+vline!(randPlot1, [mean(boolDict[true] .< .5)], color = :gold, linestyle = :dot, linewidth = 4, label = "Mass Reject")
 
 randPlot2 = histogram(boolDict[false]; bins = -.1:.01:1.1,
     title = "Preference-Magnitude Proportionate", label = "", 
     alpha = .9,
     normalize = :probability)
 vline!(randPlot2, [median(boolDict[false])], color = :blue, linewidth = 4, label = "Median")
+vline!(randPlot2, [mean(boolDict[false])], color = :blue, linewidth = 4, linestyle= :dot, label = "Mean")
+vline!(randPlot2, [mean(boolDict[false] .< .5)], color = :gold, linestyle = :dot, linewidth = 4, label = "Mass Reject")
+
 plot(randPlot1, randPlot2, layout = (2,1), plot_title = "Random Sequence \nvs.\n Proportionate to Magnitude of Preferences", titlefontsize = 10)
 ```
 
 When $n$ is large however, the impact is significant. 
 ```julia; echo = false; dpi = 500; fig_cap = "Now each society consists of 300 individuals with a [.3, .5, .2] preference proportions (DONTs, UNSUREs, DOs) where the sequences is RANDOM or PROPORTIONAL TO PREFERENCE MAGNITUDE. Each society is run independently 5,000 times. A majority above .5 indicates ACCEPT was the final majority; below indicates REJECT."
-
 
 bools = [true, false]
 boolDict = Dict()
@@ -100,12 +209,17 @@ randPlot1 = histogram(boolDict[true]; bins = -.01:.01:1.,
     alpha = .4, 
     normalize = :probability)
 vline!(randPlot1, [median(boolDict[true])], color = :orange, linewidth = 4, label = "Median")
+vline!(randPlot1, [mean(boolDict[true])], color = :orange, linestyle = :dot, linewidth = 4, label = "Mean")
+vline!(randPlot1, [mean(boolDict[true] .< .5)], color = :gold, linewidth = 4, label = "Mass Reject")
 
 randPlot2 = histogram(boolDict[false]; bins = -.01:.01:1.,
     title = "Preference-Magnitude Proportionate", label = "", 
     alpha = .9,
     normalize = :probability)
 vline!(randPlot2, [median(boolDict[false])], color = :blue, linewidth = 4, label = "Median")
+vline!(randPlot2, [mean(boolDict[false])], color = :blue, linestyle = :dot, linewidth = 4, label = "Mean")
+vline!(randPlot2, [mean(boolDict[false] .< .5)], color = :gold, linewidth = 4, label = "Mass Reject")
+
 plot(randPlot1, randPlot2, layout = (2,1), plot_title = "N = 300", titlefontsize = 10)
 ```
 
@@ -121,8 +235,8 @@ $U(A) > U(R)$ iff $U(A|A) > c(1-2p)$ for individual i
 
 ### Graphs
 
-```julia; echo = false; dpi = 500; fig_cap = "Each society consists of 30 individuals with a [.3, .5, .2] preference proportions (DONTs, UNSUREs, DOs) with costs drawn from [.2, .5, 1., 1.5, 2.]. Each society is run independently 1,000 times. A majority above .5 indicates ACCEPT was the final majority; below indicates REJECT. Median values for each cost are shown by points on the x-axis."
-costs = [.1, .7,  1.5]
+```julia; echo = false; dpi = 500; fig_cap = "Each society consists of 60 individuals with a [.3, .5, .2] preference proportions (DONTs, UNSUREs, DOs) with costs drawn from [.3, .7, 1.5]. Each society is run independently 5,000 times. A majority above .5 indicates ACCEPT was the final majority; below indicates REJECT. Median values for each cost are shown by points on the x-axis, mean values as a dotted line, and the mass-reject as a solid line."
+costs = [.3, .7,  1.5]
 costDict = Dict()
 for cost in costs # For each cost
     maj = [] # Construct output vector
@@ -130,9 +244,9 @@ for cost in costs # For each cost
         print(maj)
     end
 
-    for iter in 1:1000 # 10 000 universes
+    for iter in 1:5000 # 10 000 universes
         # Initialize society
-        society = init(30, cost, false , [.3, .5, .2], true)
+        society = init(60, cost, false , [.3, .5, .2], true)
         # Iterate
         iterate!(society)
         # Store majority in maj array
@@ -142,24 +256,146 @@ for cost in costs # For each cost
     costDict[cost] = maj
 end
 
-
-plot1 = histogram(costDict[.1]; bins = -.1:.01:1.1, 
-    label = "c = .1", color = :orange, fillalpha = .8, 
-    title = "\nN = 30, Preference props = [.3, .5, .2], Preference-Proportionate Sequence", titlefontsize = 10
+plot1 = histogram(costDict[.3]; bins = -.1:.01:1.1, 
+    label = "c = .3", color = :orange, fillalpha = .8, legend_position = :outerleft,
+    title = "N = 60, Preference props = [.3, .5, .2]\n Pref-Prop Seq \n c = .3",
+    normalize = :probability
     )
-plot2 = histogram(costDict[.1]; bins = -.1:.01:1.1, 
-    label = "c = .1", color = :orange, fillalpha = .8, 
-    legend_position = :inside)
-histogram!(plot1, costDict[.7]; bins = -.1:.01:1.1, label = "c = .7", color = :blue, fillalpha = .4)
-histogram!(plot2, costDict[1.5]; bins = -.1:.01:1.1, label = "c = 1.5", color = :red, fillalpha = .7)
+vline!(plot1, [mean(costDict[.3] .< .5)], linewidth = 4, color = :orange, label = "Mass Reject")
+vline!(plot1, [mean(costDict[.3])], linewidth = 4, color = :orange, linestyle = :dot, label = "Mean")
+scatter!(plot1, (median(costDict[.3]), 0), color = :orange, label = "Median", markersize = 7, markershape = :utriangle, markeralpha = .8 )
 
-scatter!(plot1, (median(costDict[.1]), 0), color = :orange, label = "Median c = .1", markersize = 7, markershape = :utriangle, markeralpha = .8 )
-scatter!(plot1, (median(costDict[.7]), 0), color = :blue, label = "Median c = .7", markersize = 7, markershape = :diamond, markeralpha = .8  )
+plot2 = histogram(costDict[.7]; bins = -.1:.01:1.1, label = "c = .7", color = :blue, legend_position = :outerleft,fillalpha = .4, title= "c = .7",
+    normalize = :probability)
+vline!(plot2, [mean(costDict[.7] .< .5)], linewidth = 4, color = :blue, label = "Mass Reject")
+vline!(plot2, [mean(costDict[.7])], linewidth = 4, color = :blue,linestyle = :dot, label = "Mean")
+scatter!(plot2, (median(costDict[.7]), 0), color = :blue, label = "Median", markersize = 7, markershape = :diamond, markeralpha = .8  )
 
-scatter!(plot2, (median(costDict[.1]), 0), color = :orange, label = "Median c = .1", markersize = 7, markershape = :utriangle, markeralpha = .8)
-scatter!(plot2, (median(costDict[1.5]), 0), color = :red, label = "Median c = 1.5", markersize = 7, markershape = :diamond, markeralpha = .7)
+plot3 = histogram(costDict[1.5]; bins = -.1:.01:1.1, 
+    title = "c = 1.5",
+    label = "c = 1.5", color = :red, fillalpha = .8,
+    legend_position = :outerleft,
+    normalize = :probability)
+vline!(plot3, [mean(costDict[1.5] .< .5)], linewidth = 4, color = :red, label = "Mass Reject")
+vline!(plot3, [mean(costDict[1.5])], linewidth = 4, color = :red, linestyle = :dot, label = "Mean")
+scatter!(plot3, (median(costDict[1.5]), 0), color = :red, label = "Median", markersize = 7, markershape = :diamond, markeralpha = .7)
 
-plot( plot1, plot2, layout = (2,1), plot_title = "Effect of Varying Minority Cost", topmargin=2Plots.mm)
+plot( plot1, plot2, plot3, layout = (3,1), plot_title = "Effect of Varying Minority Cost ", topmargin=2Plots.mm, size = (700, 600))
 
 ```
 
+## Effect of Unsure Proportion
+
+I now vary the proportion of the group that is defined by no preference over outcomes. I vary this proportion from a minority to a majority. In all cases, the size of the REJECT faction is twice the size of the ACCEPT faction. 
+### Preference Proportionate Sequencing
+```julia; echo = false; dpi = 500; fig_cap = "Each society is defined by a different preference proportions (DONTs, UNSUREs, DOs), drawn from [ [.6, .1, .3] , [.4, .4, .2], [.8/3 , .6, .4/3], [.4/3, .8, .2/3]],  with group size, 60. Each society is run independently 5,000 times. A majority above .5 indicates ACCEPT was the final majority; below indicates REJECT. Mean values for each set of universes are shown by the black dotted lines. In all cases, agents' ordering of statements is proportionate to the magnitude of their preference."
+unsProps = [[.6, .1, .3] , [.4, .4, .2], [.8/3 , .6, .4/3] , [.4/3, .8, .2/3] ]
+unsDict = Dict()
+counter = 1
+for propr in unsProps # For each cost
+    maj = [] # Construct output vector
+
+    for iter in 1:5000 # 10 000 universes
+        # Initialize society
+        society = init(60, .5, false , propr, true)
+        # Iterate
+        iterate!(society)
+        # Store majority in maj array
+        push!(maj, mean(society.performances.==1))
+    end
+    # Assing maj vector to costDict for processing
+    unsDict[counter] = maj
+    counter += 1 
+end
+
+plot1 = histogram(unsDict[1]; bins = -.1:.01:1.1, 
+    label = "[.6, .1, .3]", color = :red, fillalpha = .8, 
+    title = "[.6, .1, .3]\nminorityCost = .5", 
+    normalize = :probability, legend = :outertopleft
+    )
+vline!(plot1, [mean(unsDict[1])], label = "Mean", linestyle = :dot, color = :black, linewidth = 5)
+vline!(plot1, [median(unsDict[1])], label = "Median", color = :black, linewidth = 5)
+vline!(plot1, [mean(unsDict[1] .< .5)], label = "Mass Reject", color = :gold, linewidth = 5)
+
+plot2 = histogram(unsDict[2]; bins = -.1:.01:1.1, 
+    label = "[.4, .4, .2]", color = :red, fillalpha = .8, title = "[.4, .4, .2]",
+    normalize = :probability, legend = :outertopleft)
+vline!(plot2, [mean(unsDict[2])], label = "Mean", linestyle = :dot, color = :black, linewidth = 5)
+vline!(plot2, [median(unsDict[2])], label = "Median", color = :black, linewidth = 5)
+vline!(plot2, [mean(unsDict[2] .< .5)], label = "Mass Reject", color = :gold, linewidth = 5)
+
+plot3 = histogram(unsDict[3]; bins = -.1:.01:1.1, 
+    label = "[.27 , .6, .13]", color = :red, fillalpha = .8, title = "[.27 , .6, .13]",
+    normalize = :probability, legend = :outertopleft)
+vline!(plot3, [mean(unsDict[3])], label = "Mean", linestyle = :dot, color = :black, linewidth = 5)
+vline!(plot3, [median(unsDict[3])], label = "Median", color = :black, linewidth = 5)
+vline!(plot3, [mean(unsDict[3] .< .5)], label = "Mass Reject", color = :gold, linewidth = 5)
+
+plot4 = histogram(unsDict[4]; bins = -.1:.01:1.1, 
+    label = "[.13 , .8, .07]", color = :red, fillalpha = .8, title = "[.13 , .8, .07]",
+    normalize = :probability, legend = :outertopleft)
+vline!(plot4, [mean(unsDict[4])], label = "Mean", linestyle = :dot, color = :black, linewidth = 5)
+vline!(plot4, [median(unsDict[4])], label = "Median", color = :black, linewidth = 5)
+vline!(plot4, [mean(unsDict[4] .< .5)], label = "Mass Reject", color = :gold, linewidth = 5)
+
+plot( plot1, plot2, plot3, plot4, layout = (4,1), plot_title = "Varying Unsure Proportion: Pref-Prop", topmargin=2Plots.mm,
+    size = (600, 650))
+
+```
+### Random Sequencing
+
+```julia; echo = false; dpi = 500; fig_cap = "Same as previous figure but sequencing is now random."
+unsProps = [[.6, .1, .3] , [.4, .4, .2], [.8/3 , .6, .4/3] , [.4/3, .8, .2/3] ]
+unsDict = Dict()
+counter = 1
+for propr in unsProps # For each cost
+    maj = [] # Construct output vector
+
+    for iter in 1:5000 # 10 000 universes
+        # Initialize society
+        society = init(60, .5, true , propr, true)
+        # Iterate
+        iterate!(society)
+        # Store majority in maj array
+        push!(maj, mean(society.performances.==1))
+    end
+    # Assing maj vector to costDict for processing
+    unsDict[counter] = maj
+    counter += 1 
+    println(counter)
+end
+
+plot1 = histogram(unsDict[1]; bins = -.1:.01:1.1, 
+    label = "[.6, .1, .3]", color = :red, fillalpha = .8, 
+    title = "[.6, .1, .3]\nminorityCost = .5", 
+    normalize = :probability, legend = :outertopleft
+    )
+vline!(plot1, [mean(unsDict[1])], label = "Mean", linestyle = :dot, color = :black, linewidth = 5)
+vline!(plot1, [median(unsDict[1])], label = "Median", color = :black, linewidth = 5)
+vline!(plot1, [mean(unsDict[1] .< .5)], label = "Mass Reject", color = :gold, linewidth = 5)
+
+plot2 = histogram(unsDict[2]; bins = -.1:.01:1.1, 
+    label = "[.4, .4, .2]", color = :red, fillalpha = .8, title = "[.4, .4, .2]",
+    normalize = :probability, legend = :outertopleft)
+vline!(plot2, [mean(unsDict[2])], label = "Mean", linestyle = :dot, color = :black, linewidth = 5)
+vline!(plot2, [median(unsDict[2])], label = "Median", color = :black, linewidth = 5)
+vline!(plot2, [mean(unsDict[2] .< .5)], label = "Mass Reject", color = :gold, linewidth = 5)
+
+plot3 = histogram(unsDict[3]; bins = -.1:.01:1.1, 
+    label = "[.27 , .6, .13]", color = :red, fillalpha = .8, title = "[.27 , .6, .13]",
+    normalize = :probability, legend = :outertopleft)
+vline!(plot3, [mean(unsDict[3])], label = "Mean", linestyle = :dot, color = :black, linewidth = 5)
+vline!(plot3, [median(unsDict[3])], label = "Median", color = :black, linewidth = 5)
+vline!(plot3, [mean(unsDict[3] .< .5)], label = "Mass Reject", color = :gold, linewidth = 5)
+
+plot4 = histogram(unsDict[4]; bins = -.1:.01:1.1, 
+    label = "[.13 , .8, .07]", color = :red, fillalpha = .8, title = "[.13 , .8, .07]",
+    normalize = :probability, legend = :outertopleft)
+vline!(plot4, [mean(unsDict[4])], label = "Mean", linestyle = :dot, color = :black, linewidth = 5)
+vline!(plot4, [median(unsDict[4])], label = "Median", color = :black, linewidth = 5)
+vline!(plot4, [mean(unsDict[4] .< .5)], label = "Mass Reject", color = :gold, linewidth = 5)
+
+plot( plot1, plot2, plot3, plot4, layout = (4,1), plot_title = "Effect of Varying Unsure Proportion: Random", topmargin=2Plots.mm,
+    size = (600, 600))
+
+```

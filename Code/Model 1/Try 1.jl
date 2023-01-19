@@ -1,6 +1,6 @@
 using Pkg
 Pkg.activate(".")
-using Distributions, StatsBase, Random, Plots, DataFrames, Tables, SQLite
+using Distributions, StatsBase, Random, DataFrames, Tables, SQLite
 
 ############################ Key Assumptions ###################
 # Individuals start with shared uniform distribution over proportions of accept/reject
@@ -127,11 +127,13 @@ function iterate!(soc::Society)
         # Utility of stating reject is the preference for reject (the negative of utilAccept) * prob reject - cost of minority * probability accept (because focal agent stated reject)
         U_R = -agent.utilAccept*mode_reject - soc.minorityCost*mode_accept
             
-        # Set agent's decision
+        # Set agent's decision: If one of actions has a higher utility, select that, else if (utilities of actions are same, but agent has true pref), select true preference, else (agent has no true pref), select randomly
         if U_A != U_R
             agent.decision = ifelse(argmax([U_A, U_R]) == 1, 1, -1) # First is accept then reject, set decision
-        else
+        elseif agent.utilAccept != 0
             agent.decision = ifelse(argmax([agent.utilAccept, -agent.utilAccept]) == 1, 1, -1) # If utilities of each action are same, pick A if UAA higher than URR. Idea here is that agents have some idea they're trying to persuade. 
+        else # if agent has U_A = U_R AND utilAccept = 0 (they have no preference) then pick randomly
+            agent.decision = ifelse(rand([1, -1]) == 1, 1, -1)
         end
         # 2. Append statement to public sequence and update beliefs
         push!(soc.performances, agent.decision) # Append to array
@@ -182,14 +184,14 @@ end
 
 """
     Function initializes a society and runs gen times (independent universes), storing the simulation in an SQLdatabase.
-    Must provide
+    User provides
         gens                INT                 Number of universes that should be run
         N                   INT                 Size of communities
         minorityCost        FLT                 Cost of being in the minority
         randomSeq           BOOL                true if random sequence, false if sequence prop to magnitude of pref
         propPref            ARR                 Proportion of society with preferences rejecting, unsure, and accepting
         binomialBeliefs     BOOL                true if binomial beliefs else multinomial
-        dbName              TXT                 Name of table inside of database
+        tableName              TXT              Name of table inside of database, if false
 
     DB Stored values are: gen (INTEGER & primary key), agent (INTEGER and effectively time variable defined by sequence of choice), alpha & beta values (INTEGERS), prior (REAL) denoting alpha/(alpha + beta) prior, uAA (REAL the utility of A|A), uRR (REAL the utility of R|R), statement (INTEGER, 1 or -1 denoting what agent stated)
     
@@ -197,8 +199,9 @@ end
 """
 function run(gens, N, minorityCost, randomSeq, propPref, binomialBeliefs, tableName)
     
-    db = SQLite.DB("Sim Data/SimulationDB.db")
-
+    if typeof(tableName) == String
+        db = SQLite.DB("Sim Data/SimulationDB.db")
+    end
     # CREATE TABLE I don't think I need this using DataFrames
     #SQLite.createtable!(db, "$tableName", 
     #    Tables.Schema((:Gen, :Agent, :AlphaBefore, :BetaBefore, :uAA, :statement, :AlphaAfter, :BetaAfter), 
@@ -213,28 +216,30 @@ function run(gens, N, minorityCost, randomSeq, propPref, binomialBeliefs, tableN
         append!(df, gen_df) # Append to df
     end
     
-    # Convert to sql table
-    SQLite.load!(df, db, "$tableName")
+    if typeof(tableName) == String
+        # Convert to sql table
+        SQLite.load!(df, db, "$tableName")
+    end
     return df
 end
 
-society = init(20, .8, false, [.3, .4, .3], false)
-test = iterate!(society)
+# society = init(20, .8, false, [.3, .4, .3], false)
+# test = iterate!(society)
 
-test = run(3, 20, 1.7, false, [.3, .4, .3], true, "test2")
+# test = run(3, 20, 1.7, false, [.3, .4, .3], true, "test2")
 
-v = getfield.(society.agents, :utilAccept)
-mean(v.<0/1000000)
-mean(v.>0/1000000)
-mean(v.==0/1000000)
-g=[]
-for i in 1:2000
-    society = init(20, .2, false , [.3, .5, .2], true)
-    println(mean(getfield.(society.agents, :utilAccept)))
-    iterate!(society)
-    push!(g, mean(society.performances))
-end
-print(mean(g))
-histogram(g; bins = -1.1:.05:1.1)
-print(mean(society.utilities))
+# v = getfield.(society.agents, :utilAccept)
+# mean(v.<0/1000000)
+# mean(v.>0/1000000)
+# mean(v.==0/1000000)
+# g=[]
+# for i in 1:2000
+#     society = init(20, .2, false , [.3, .5, .2], true)
+#     println(mean(getfield.(society.agents, :utilAccept)))
+#     iterate!(society)
+#     push!(g, mean(society.performances))
+# end
+# print(mean(g))
+# histogram(g; bins = -1.1:.05:1.1)
+# print(mean(society.utilities))
 
