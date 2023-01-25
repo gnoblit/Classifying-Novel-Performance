@@ -36,8 +36,28 @@ using Weave, Plots
 * p denotes the agent's belief that the group will ultimately come to **Accept** the performance as normatively-acceptible. (1-p) is the probability it will be rejected. These beliefs are essentially the proportion of the group stating **Accept**
     + Beliefs start with a uniform beta prior, across all individuals. This distribution is then sequentially updated as each agent makes a statement in sequence. 
 
-# Results
+# Concerns
+* No agents update their preferences in light of new information. This is one of the perceived functions of group debate in small-scale societies. In essence, individuals are making claims about the state of the environment based on personal signals. (What if we made signals conditioned on utility, i.e. individuals "read" on the environment or the signal that they receive is biased by their preferred outcome - individuals perceive situations differently.). Not obvious how and under what conditions something someone else says is informative to a focal individaul or what individuals who prefer a REJECT will learn from individuals stating ACCEPT.
 
+# Convergence Results
+
+We can ask how long, at what proportion of group-size, until beliefs convergent to a sufficient degree that all individuals end up selecting identical statements. 
+
+We can identify analytically when U(A) > U(R) for individual i:
+
+$U(A) = pU(A|A)- (1-p)c$
+
+$U(R) = (1-p)U(R|R) - pc$ where U(R|R) = -U(A|A) for individual i
+
+$U(A) > U(R)$ iff $U(A|A) > c(1-2p)$ for individual i
+
+Alternatively, $p > \frac{1}{2}(1-\frac{U(A|A)}{c})$ for individual i.
+
+Individual i will state ACCEPT so long as their belief that the group will ultimately ACCEPT exceeds the above criterion, defined by their perceived utility of A|A and their cost to being in the minority once the group-decision is made.
+
+While I have modeled the minority-cost as identical for all individauls in the group, individuals have idiosyncratic preferences. This makes it difficult to identify analytically when group-members will converge to a single statement based on their beliefs. Instead, 
+
+# Outcome Results
 
 ## Effect of Group Size
 

@@ -1,8 +1,404 @@
+### A Pluto.jl notebook ###
+# v0.19.20
+
+using Markdown
+using InteractiveUtils
+
+# ╔═╡ 48eee69f-1ae2-438c-8816-d76aea8f85a4
+using Plots, Distributions, StatsBase, Random, DataFrames, Tables, SQLite; include("../Code/Model 1/Try 1.jl");
+
+# ╔═╡ 4951c40d-e08c-48f5-a364-63a76a00133a
+md"""
+# Model Summary
+"""
+
+# ╔═╡ 4a54a800-990d-11ed-31f8-ff5066c0c38e
+md"
+Groups of size ``N``
+
+Unclassified behavior has occurred that group must classify as normative (``1``) or norm-breaking (``-1``).
+
+Agents have opportunity to publicly state whether they ACCEPT or REJECT the behavior as normative. 
+
+Majority rule ultimately decides how group will classify the novel performance.
+
+Agents possess preferences over three things depending on how the group ultimately comes to classify the behavior:
+- ``U(A|A)``, the utility of stating ACCEPT given that the group accepts
+- ``U(R|R)``, the utility of stating REJECT given that the group rejects.
+- ``U(A|R) = U(R|A)``, the utility of miscoordinating with the group (stating A when group comes to R and vice versa).
+- For all agents, the miscoordinating cost ``= c``.
+
+Three classes of agents exist with distinct preference orderings
+- DOs: ``U(A|A) > U(R|R)``; ``U(A|A)`` is drawn from a uniform distribution defined for ``(0,1)``. ``U(R|R) = -U(A|A)``
+- DON'Ts: ``U(R|R) > U(A|A)``; ``U(R|R)`` is drawn from a uniform distribution defined for ``(-1,0)``. ``U(R|R) = -U(A|A)``
+- UNSURES: ``U(A|A) = U(R|R) = 0``
+
+Individuals do not choose when they state ACCEPT or REJECT. Sequence ordering occurs either randomly or where position is proportionate to the magnitude of one's preferences with agents with preferences closer to ``1, -1`` going earlier in sequence. This occurs stochastically.
+- Seeks to model that UNSUREs are mostly concerned about coordinating with the group, which means they want to hang back and understand what outcome is most likely to occur before they make a public statement. 
+
+- Utility of stating ACCEPT defined as ``pU(A|A) - (1-p)c`` where ``p`` is individual ``i``'s belief over the proportion of group that states ACCEPT.
+- Utility of stating REJECT defined as ``(1-p)U(R|R) - pc``.
+- Agent picks larger. If utilities are random, agent selects their larger true preference (``U(A|A)`` or ``U(R|R)``)
+- ``p`` begins as a shared Beta prior, initially uniform, over the proportion of the group that will state ACCEPT. This belief is updated sequentially as individuals make their statements.
+"
+
+# ╔═╡ 5a710a7d-4687-4df7-a9d9-c9c828c9afab
+md"""
+# Outcome Results
+"""
+
+# ╔═╡ 6e655d43-9611-4a9d-8ccb-fe92d6bea6c3
+md"""
+## Effect of Group Size
+
+Initially I examine how altering the size of the group, for a given society, impacts what outcome is chosen. 
+"""
+
+# ╔═╡ 2aa72e33-48f3-4604-9888-eb426f3450c6
+begin
+	Ns = [15, 60, 120, 240]
+	NDict = Dict()
+	for N in Ns # For each cost
+	    maj = [] # Construct output vector
+	
+	    for iter in 1:3000 # 10 000 universes
+	        # Initialize society
+	        society = init(N, .5, false , [.3, .5, .2], true)
+	        # Iterate
+	        iterate!(society)
+	        # Store majority in maj array
+	        push!(maj, mean(society.performances.==1))
+	    end
+	    # Assing maj vector to costDict for processing
+	    NDict[N] = maj
+	end
+	Nplot1 = histogram(NDict[15], bins = -.1:.01:1.1, 
+	    label = "N = 15", color = :orange, fillalpha = .8, legend_position = :outerleft, 
+	    title = "\nminorityCost = .5, Preference props = [.3, .5, .2], Pref-Prop Seq", titlefontsize = 10, 
+	    normalize = :probability
+	); nothing
+	vline!(Nplot1, [mean(NDict[15])], label = "Mean", linestyle = :dot, color = :black, linewidth = 5);
+	vline!(Nplot1, [median(NDict[15])], label = "Median", color = :black, linewidth = 5);
+	vline!(Nplot1, [mean(NDict[15] .< .5)], label = "Mass Reject", color = :gold, linewidth = 5);
+	
+	Nplot2 = histogram(NDict[60], bins = -.1:.01:1.1, 
+	    label = "N = 60", color = :orange, fillalpha = .8, 
+	    legend_position = :outerleft, 
+	    normalize = :probability)
+	vline!(Nplot2, [mean(NDict[60])], label = "Mean", linestyle = :dot, color = :black, linewidth = 5);
+	vline!(Nplot2, [median(NDict[60])], label = "Median", color = :black, linewidth = 5);
+	vline!(Nplot2, [mean(NDict[60] .< .5)], label = "Mass Reject", color = :gold, linewidth = 5);
+	
+	Nplot3 = histogram(NDict[120], bins = -.1:.01:1.1, 
+	    label = "N = 120", color = :orange, fillalpha = .8, 
+	    legend_position = :outerleft, 
+	    normalize = :probability)
+	vline!(Nplot3, [mean(NDict[120])], label = "Mean", linestyle = :dot, color = :black, linewidth = 5);
+	vline!(Nplot3, [median(NDict[120])], label = "Median", color = :black, linewidth = 5);
+	vline!(Nplot3, [mean(NDict[120] .< .5)], label = "Mass Reject", color = :gold, linewidth = 5);
+	
+	Nplot4 = histogram(NDict[240], bins = -.1:.01:1.1, 
+	    label = "N = 240", color = :orange, fillalpha = .8, 
+	    legend_position = :outerleft, 
+	    normalize = :probability); nothing
+	vline!(Nplot4, [mean(NDict[240])], label = "Mean", linestyle = :dot, color = :black, linewidth = 5); nothing
+	vline!(Nplot4, [median(NDict[240])], label = "Median", color = :black, linewidth = 5); nothing
+	vline!(Nplot4, [mean(NDict[240] .< .5)], label = "Mass Reject", color = :gold, linewidth = 5); nothing
+end
+
+# ╔═╡ ed5e8997-a2c6-4aaa-b239-b4b018752e80
+plot( Nplot1, Nplot2, Nplot3, Nplot4, layout = (4,1), plot_title = "Effect of Varying Group Size", topmargin=4Plots.mm, size = (700, 650))
+
+# ╔═╡ 1d39b66b-44c4-47f9-a3ce-e0829389eac7
+md"""
+> Each society is defined by a [.3, .5, .2] preference proportions (DONTs, UNSUREs, DOs) with group size, N, drawn from [15, 60, 120, 240]. Each society is run independently 3,000 times. A majority above .5 indicates ACCEPT was the final majority; below indicates REJECT. Mean values for each set of universes are shown by the black dotted lines. In all cases, agents' ordering of statements is random.
+"""
+
+# ╔═╡ b71b2e33-1ef5-4af6-bb34-2fbb9a70b6a5
+md"""
+We see that as group size increases, the dominant plurality is more likely to win, likely because there is a greater opportunity for beliefs to converge. Larger groups mean the group's composition is more likely to reflect the underlying distribution it's drawn from, here [.3, .5, .2], DONTs first.
+"""
+
+# ╔═╡ a330541c-f668-4e6d-b2ea-4378be5446d9
+md"""
+## Effect of Random vs. Opinion-Proportionate Sequence ordering
+"""
+
+# ╔═╡ 61b3023b-4e9e-42e9-ad66-ce029af65b70
+begin
+	bools = [true, false]
+	boolDict = Dict()
+	for bool in bools # For each cost
+	    maj = [] # Construct output vector
+	    for iter in 1:5000 # 5 000 universes
+	        # Initialize society
+	        society = init(30, .5, bool , [.3, .5, .2], true)
+	        # Iterate
+	        iterate!(society)
+	        # Store majority in maj array
+	        push!(maj, mean(society.performances.==1))
+	    end
+	    # Assing maj vector to costDict for processing
+	    boolDict[bool] = maj
+	end
+	
+	randPlot1 = histogram(boolDict[true]; bins = -.1:.01:1.1,
+	    title = "\n\n\n\nRandom", label = "", color = :orange,
+	    alpha = .4, 
+	    normalize = :probability);
+	vline!(randPlot1, [median(boolDict[true])], color = :orange, linewidth = 4, label = "Median");
+	vline!(randPlot1, [mean(boolDict[true])], color = :orange, linestyle = :dot, linewidth = 4, label = "Mean");
+	vline!(randPlot1, [mean(boolDict[true] .< .5)], color = :gold, linestyle = :dot, linewidth = 4, label = "Mass Reject");
+	
+	randPlot2 = histogram(boolDict[false]; bins = -.1:.01:1.1,
+	    title = "Preference-Magnitude Proportionate", label = "", 
+	    alpha = .9,
+	    normalize = :probability);
+	vline!(randPlot2, [median(boolDict[false])], color = :blue, linewidth = 4, label = "Median");
+	vline!(randPlot2, [mean(boolDict[false])], color = :blue, linewidth = 4, linestyle= :dot, label = "Mean");
+	vline!(randPlot2, [mean(boolDict[false] .< .5)], color = :gold, linestyle = :dot, linewidth = 4, label = "Mass Reject");
+	
+	plot(randPlot1, randPlot2, layout = (2,1), plot_title = "Random Sequence \nvs.\n Proportionate to Magnitude of Preferences", titlefontsize = 10)
+end
+
+# ╔═╡ 7638877a-9be3-4d22-a8fd-e14626f43d6d
+md"""
+> Now each society consists of 300 individuals with a [.3, .5, .2] preference proportions (DONTs, UNSUREs, DOs) where the sequences is RANDOM or PROPORTIONAL TO PREFERENCE MAGNITUDE. Each society is run independently 5,000 times. A majority above .5 indicates ACCEPT was the final majority; below indicates REJECT.
+
+As we might expect, a random sequence means the larger plurality is less-likely to win out. When individuals with stronger preferences are more likely to make public statements first it leads to a bandwagoning effect.
+"""
+
+# ╔═╡ 08a22f71-628b-479c-81e9-69206f6496a0
+md"""
+## Effect of Varying Minority-cost
+
+We can identify analytically when $U(A) > U(R)$ for individual $i$:
+
+$U(A) = pU(A|A)- (1-p)c$
+
+$U(R) = (1-p)U(R|R) - pc$ where $U(R|R) = -U(A|A)$ 
+
+$U(A) > U(R) \text{ iff } U(A|A) > c(1-2p)$
+"""
+
+# ╔═╡ b050c890-0597-4d07-add4-4160880becce
+begin
+	costs = [.3, .7,  1.5]
+	costDict = Dict()
+	for cost in costs # For each cost
+	    maj = [] # Construct output vector
+	    if length(maj) != 0
+	        print(maj)
+	    end
+	    for iter in 1:5000 # 10 000 universes
+	        # Initialize society
+	        society = init(60, cost, false , [.3, .5, .2], true)
+	        # Iterate
+	        iterate!(society)
+	        # Store majority in maj array
+	        push!(maj, mean(society.performances.==1))
+	    end
+	    # Assing maj vector to costDict for processing
+	    costDict[cost] = maj
+	end
+	
+	costplot1 = histogram(costDict[.3]; bins = -.1:.01:1.1, 
+	    label = "c = .3", color = :orange, fillalpha = .8, legend_position = :outerleft,
+	    title = "N = 60, Preference props = [.3, .5, .2]\n Pref-Prop Seq \n c = .3",
+	    normalize = :probability);
+	vline!(costplot1, [mean(costDict[.3] .< .5)], linewidth = 4, color = :orange, label = "Mass Reject");
+	vline!(costplot1, [mean(costDict[.3])], linewidth = 4, color = :orange, linestyle = :dot, label = "Mean");
+	scatter!(costplot1, (median(costDict[.3]), 0), color = :orange, label = "Median", markersize = 7, markershape = :utriangle, markeralpha = .8 );
+	
+	costplot2 = histogram(costDict[.7]; bins = -.1:.01:1.1, label = "c = .7", color = :blue, legend_position = :outerleft,fillalpha = .4, title= "c = .7",
+	    normalize = :probability);
+	vline!(costplot2, [mean(costDict[.7] .< .5)], linewidth = 4, color = :blue, label = "Mass Reject");
+	vline!(costplot2, [mean(costDict[.7])], linewidth = 4, color = :blue,linestyle = :dot, label = "Mean");
+	scatter!(costplot2, (median(costDict[.7]), 0), color = :blue, label = "Median", markersize = 7, markershape = :diamond, markeralpha = .8  );
+	
+	costplot3 = histogram(costDict[1.5]; bins = -.1:.01:1.1, 
+	    title = "c = 1.5",
+	    label = "c = 1.5", color = :red, fillalpha = .8,
+	    legend_position = :outerleft,
+	    normalize = :probability);
+	vline!(costplot3, [mean(costDict[1.5] .< .5)], linewidth = 4, color = :red, label = "Mass Reject");
+	vline!(costplot3, [mean(costDict[1.5])], linewidth = 4, color = :red, linestyle = :dot, label = "Mean");
+	scatter!(costplot3, (median(costDict[1.5]), 0), color = :red, label = "Median", markersize = 7, markershape = :diamond, markeralpha = .7);
+	
+	plot(costplot1, costplot2, costplot3, layout = (3,1), plot_title = "Effect of Varying Minority Cost ", topmargin=2Plots.mm, size = (700, 600))
+
+end
+
+# ╔═╡ 4029d6bf-87ed-4b95-a2db-25762b2a3cfb
+md"""
+> Each society consists of 60 individuals with a [.3, .5, .2] preference proportions (DONTs, UNSUREs, DOs) with costs drawn from [.3, .7, 1.5]. Each society is run independently 5,000 times. A majority above .5 indicates ACCEPT was the final majority; below indicates REJECT. Median values for each cost are shown by points on the x-axis, mean values as a dotted line, and the mass-reject as a solid line.
+
+Increasing the cost to being in the minority, relative to the range of preferences, has a strong effect. If $c$ is large then individuals must have strong ACCEPT preferences in order to state ACCEPT, holding $p$ constant. The same is true for REJECT. Increasing costs then drives agents with stronger preferences to state their true preference and in this society, the distribution of preferences is biased towards REJECT. 
+"""
+
+# ╔═╡ 071091ef-0ecc-4c66-8483-12f12dc8a342
+md"""
+## Effect of Unsure Proportion
+I now vary the proportion of the group that is defined by no preference over outcomes. I vary this proportion from a minority to a majority. In all cases, the size of the REJECT faction is twice the size of the ACCEPT faction. 
+
+### Preference-Magnitude Proportionate Sequencing
+"""
+
+# ╔═╡ a75d8729-a325-48db-bce9-dc236cd3dced
+begin
+	unsprefProps = [[.6, .1, .3] , [.4, .4, .2], [.8/3 , .6, .4/3] , [.4/3, .8, .2/3] ]
+	unsprefDict = Dict()
+	local unsurecounter = 1
+	for propr in unsprefProps # For each cost
+	    maj = [] # Construct output vector
+	
+	    for iter in 1:5000 # 10 000 universes
+	        # Initialize society
+	        society = init(60, .5, false , propr, true)
+	        # Iterate
+	        iterate!(society)
+	        # Store majority in maj array
+	        push!(maj, mean(society.performances.==1))
+	    end
+	    # Assing maj vector to costDict for processing
+	    unsprefDict[unsurecounter] = maj
+	    unsurecounter += 1 
+	end
+	
+	unsureprefplot1 = histogram(unsprefDict[1]; bins = -.1:.01:1.1, 
+	    label = "[.6, .1, .3]", color = :red, fillalpha = .8, 
+	    title = "[.6, .1, .3]\nminorityCost = .5", 
+	    normalize = :probability, legend = :outertopleft
+	    )
+	vline!(unsureprefplot1, [mean(unsprefDict[1])], label = "Mean", linestyle = :dot, color = :black, linewidth = 5)
+	vline!(unsureprefplot1, [median(unsprefDict[1])], label = "Median", color = :black, linewidth = 5)
+	vline!(unsureprefplot1, [mean(unsprefDict[1] .< .5)], label = "Mass Reject", color = :gold, linewidth = 5)
+	
+	unsureprefplot2 = histogram(unsprefDict[2]; bins = -.1:.01:1.1, 
+	    label = "[.4, .4, .2]", color = :red, fillalpha = .8, title = "[.4, .4, .2]",
+	    normalize = :probability, legend = :outertopleft)
+	vline!(unsureprefplot2, [mean(unsprefDict[2])], label = "Mean", linestyle = :dot, color = :black, linewidth = 5)
+	vline!(unsureprefplot2, [median(unsprefDict[2])], label = "Median", color = :black, linewidth = 5)
+	vline!(unsureprefplot2, [mean(unsprefDict[2] .< .5)], label = "Mass Reject", color = :gold, linewidth = 5)
+	
+	unsureprefplot3 = histogram(unsprefDict[3]; bins = -.1:.01:1.1, 
+	    label = "[.27 , .6, .13]", color = :red, fillalpha = .8, title = "[.27 , .6, .13]",
+	    normalize = :probability, legend = :outertopleft)
+	vline!(unsureprefplot3, [mean(unsprefDict[3])], label = "Mean", linestyle = :dot, color = :black, linewidth = 5)
+	vline!(unsureprefplot3, [median(unsprefDict[3])], label = "Median", color = :black, linewidth = 5)
+	vline!(unsureprefplot3, [mean(unsprefDict[3] .< .5)], label = "Mass Reject", color = :gold, linewidth = 5)
+	
+	unsureprefplot4 = histogram(unsprefDict[4]; bins = -.1:.01:1.1, 
+	    label = "[.13 , .8, .07]", color = :red, fillalpha = .8, title = "[.13 , .8, .07]",
+	    normalize = :probability, legend = :outertopleft)
+	vline!(unsureprefplot4, [mean(unsprefDict[4])], label = "Mean", linestyle = :dot, color = :black, linewidth = 5)
+	vline!(unsureprefplot4, [median(unsprefDict[4])], label = "Median", color = :black, linewidth = 5)
+	vline!(unsureprefplot4, [mean(unsprefDict[4] .< .5)], label = "Mass Reject", color = :gold, linewidth = 5)
+	
+	plot(unsureprefplot1, unsureprefplot2, unsureprefplot3, unsureprefplot4, layout = (4,1), plot_title = "Varying Unsure Proportion: Pref-Prop", topmargin=2Plots.mm,
+	    size = (600, 650))
+end
+
+# ╔═╡ f0739ce2-34b3-469c-ad81-f284c28a377b
+md"""
+> Each society is defined by a different preference proportions (DONTs, UNSUREs, DOs), drawn from [ [.6, .1, .3] , [.4, .4, .2], [.8/3 , .6, .4/3], [.4/3, .8, .2/3]],  with group size, 60. Each society is run independently 5,000 times. A majority above .5 indicates ACCEPT was the final majority; below indicates REJECT. Mean values for each set of universes are shown by the black dotted lines. In all cases, agents' ordering of statements is proportionate to the magnitude of their preference.
+
+Intuitively, increasing the unsure proportion under Preference-Magnitude Ordering leads to the larger plurality deciding. 
+"""
+
+# ╔═╡ 70699a58-9666-446a-899e-4af79b3ea3d1
+md"""
+### Random Sequencing
+With random sequencing we see the opposite effect. As the proportion of unsure individuals increases, the proportion of communities that REJECT grow closer to .5
+"""
+
+# ╔═╡ 7926d70f-f960-41e1-b1d4-79b293e0ba89
+begin
+unsrandProps = [[.6, .1, .3] , [.4, .4, .2], [.8/3 , .6, .4/3] , [.4/3, .8, .2/3] ]
+unsrandDict = Dict()
+counter = 1
+for propr in unsrandProps # For each cost
+    maj = [] # Construct output vector
+
+    for iter in 1:5000 # 10 000 universes
+        # Initialize society
+        society = init(60, .5, true , propr, true)
+        # Iterate
+        iterate!(society)
+        # Store majority in maj array
+        push!(maj, mean(society.performances.==1))
+    end
+    # Assing maj vector to costDict for processing
+    unsrandDict[counter] = maj
+    counter += 1 
+end
+
+unsrandplot1 = histogram(unsrandDict[1]; bins = -.1:.01:1.1, 
+    label = "[.6, .1, .3]", color = :red, fillalpha = .8, 
+    title = "[.6, .1, .3]\nminorityCost = .5", 
+    normalize = :probability, legend = :outertopleft
+    )
+vline!(unsrandplot1, [mean(unsrandDict[1])], label = "Mean", linestyle = :dot, color = :black, linewidth = 5)
+vline!(unsrandplot1, [median(unsrandDict[1])], label = "Median", color = :black, linewidth = 5)
+vline!(unsrandplot1, [mean(unsrandDict[1] .< .5)], label = "Mass Reject", color = :gold, linewidth = 5)
+
+unsrandplot2 = histogram(unsrandDict[2]; bins = -.1:.01:1.1, 
+    label = "[.4, .4, .2]", color = :red, fillalpha = .8, title = "[.4, .4, .2]",
+    normalize = :probability, legend = :outertopleft)
+vline!(unsrandplot2, [mean(unsrandDict[2])], label = "Mean", linestyle = :dot, color = :black, linewidth = 5)
+vline!(unsrandplot2, [median(unsrandDict[2])], label = "Median", color = :black, linewidth = 5)
+vline!(unsrandplot2, [mean(unsrandDict[2] .< .5)], label = "Mass Reject", color = :gold, linewidth = 5)
+
+unsrandplot3 = histogram(unsrandDict[3]; bins = -.1:.01:1.1, 
+    label = "[.27 , .6, .13]", color = :red, fillalpha = .8, title = "[.27 , .6, .13]",
+    normalize = :probability, legend = :outertopleft)
+vline!(unsrandplot3, [mean(unsrandDict[3])], label = "Mean", linestyle = :dot, color = :black, linewidth = 5)
+vline!(unsrandplot3, [median(unsrandDict[3])], label = "Median", color = :black, linewidth = 5)
+vline!(unsrandplot3, [mean(unsrandDict[3] .< .5)], label = "Mass Reject", color = :gold, linewidth = 5)
+
+unsrandplot4 = histogram(unsrandDict[4]; bins = -.1:.01:1.1, 
+    label = "[.13 , .8, .07]", color = :red, fillalpha = .8, title = "[.13 , .8, .07]",
+    normalize = :probability, legend = :outertopleft)
+vline!(unsrandplot4, [mean(unsrandDict[4])], label = "Mean", linestyle = :dot, color = :black, linewidth = 5)
+vline!(unsrandplot4, [median(unsrandDict[4])], label = "Median", color = :black, linewidth = 5)
+vline!(unsrandplot4, [mean(unsrandDict[4] .< .5)], label = "Mass Reject", color = :gold, linewidth = 5)
+
+plot( unsrandplot1, unsrandplot2, unsrandplot3, unsrandplot4, layout = (4,1), plot_title = "Effect of Varying Unsure Proportion: Random", topmargin=2Plots.mm,
+    size = (600, 600))
+end
+
+# ╔═╡ d7a129c2-2c7b-4e01-b850-66f3ec784d2a
+md"""
+> Same as previous figure but sequencing is now random.
+"""
+
+# ╔═╡ 00000000-0000-0000-0000-000000000001
+PLUTO_PROJECT_TOML_CONTENTS = """
+[deps]
+DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
+Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
+Plots = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
+Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
+SQLite = "0aa819cd-b072-5ff4-a722-6bc24af294d9"
+StatsBase = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
+Tables = "bd369af6-aec1-5ad0-b16a-f7cc5008161c"
+
+[compat]
+DataFrames = "~1.4.4"
+Distributions = "~0.25.80"
+Plots = "~1.38.2"
+SQLite = "~1.6.0"
+StatsBase = "~0.33.21"
+Tables = "~1.10.0"
+"""
+
+# ╔═╡ 00000000-0000-0000-0000-000000000002
+PLUTO_MANIFEST_TOML_CONTENTS = """
 # This file is machine-generated - editing it directly is not advised
 
 julia_version = "1.8.2"
 manifest_format = "2.0"
-project_hash = "eede643363bb5e4cc6a5accdbd7fefb098e180e0"
+project_hash = "38703a705459d2de9dea8aa9c2370b4db8c352f9"
 
 [[deps.ArgTools]]
 uuid = "0dad84c5-d112-42e6-8d28-ef12dabb789f"
@@ -31,11 +427,17 @@ git-tree-sha1 = "4b859a208b2397a7a623a03449e4636bdb17bcf2"
 uuid = "83423d85-b0ee-5818-9007-b63ccbeb887a"
 version = "1.16.1+1"
 
+[[deps.Calculus]]
+deps = ["LinearAlgebra"]
+git-tree-sha1 = "f641eb0a4f00c343bbc32346e1217b86f3ce9dad"
+uuid = "49dc2e85-a5d0-5ad3-a950-438e2897f1b9"
+version = "0.5.1"
+
 [[deps.ChainRulesCore]]
 deps = ["Compat", "LinearAlgebra", "SparseArrays"]
-git-tree-sha1 = "e7ff6cadf743c098e08fca25c91103ee4303c9bb"
+git-tree-sha1 = "c6d890a52d2c4d55d326439580c3b8d0875a77d9"
 uuid = "d360d2e6-b24c-11e9-a2a3-2a2ae2dbcce4"
-version = "1.15.6"
+version = "1.15.7"
 
 [[deps.ChangesOfVariables]]
 deps = ["ChainRulesCore", "LinearAlgebra", "Test"]
@@ -49,11 +451,23 @@ git-tree-sha1 = "ded953804d019afa9a3f98981d99b33e3db7b6da"
 uuid = "944b1d66-785c-5afd-91f1-9de20f533193"
 version = "0.7.0"
 
+[[deps.ColorSchemes]]
+deps = ["ColorTypes", "ColorVectorSpace", "Colors", "FixedPointNumbers", "Random", "SnoopPrecompile"]
+git-tree-sha1 = "aa3edc8f8dea6cbfa176ee12f7c2fc82f0608ed3"
+uuid = "35d6a980-a343-548e-a6ea-1d62b119f2f4"
+version = "3.20.0"
+
 [[deps.ColorTypes]]
 deps = ["FixedPointNumbers", "Random"]
 git-tree-sha1 = "eb7f0f8307f71fac7c606984ea5fb2817275d6e4"
 uuid = "3da002f7-5984-5a60-b8a6-cbb66c0b333f"
 version = "0.11.4"
+
+[[deps.ColorVectorSpace]]
+deps = ["ColorTypes", "FixedPointNumbers", "LinearAlgebra", "SpecialFunctions", "Statistics", "TensorCore"]
+git-tree-sha1 = "600cc5508d66b78aae350f7accdb58763ac18589"
+uuid = "c3611d14-8923-5661-9e6a-0046d554d3a4"
+version = "0.9.10"
 
 [[deps.Colors]]
 deps = ["ColorTypes", "FixedPointNumbers", "Reexport"]
@@ -72,17 +486,10 @@ deps = ["Artifacts", "Libdl"]
 uuid = "e66e0078-7015-5450-92f7-15fbd957f2ae"
 version = "0.5.2+0"
 
-[[deps.Conda]]
-deps = ["Downloads", "JSON", "VersionParsing"]
-git-tree-sha1 = "6e47d11ea2776bc5627421d59cdcc1296c058071"
-uuid = "8f4d0f93-b110-5947-807f-2305c1781a2d"
-version = "1.7.0"
-
-[[deps.ConjugatePriors]]
-deps = ["Distributions", "LinearAlgebra", "PDMats", "SpecialFunctions", "Statistics", "StatsFuns"]
-git-tree-sha1 = "bcfc470f3aca36a78c1736fbfe669406e2327ea6"
-uuid = "1624bea9-42b1-5fc1-afd3-e96f729c8d6c"
-version = "0.4.0"
+[[deps.Contour]]
+git-tree-sha1 = "d05d9e7b7aedff4e5b51a029dced05cfb6125781"
+uuid = "d38c429a-6771-53c6-b99e-75d170b6e991"
+version = "0.6.2"
 
 [[deps.Crayons]]
 git-tree-sha1 = "249fe38abf76d48563e2f4556bebd215aa317e15"
@@ -124,11 +531,17 @@ uuid = "ade2ca70-3891-5945-98fb-dc099432e06a"
 deps = ["Mmap"]
 uuid = "8bb1440f-4735-579b-a4ab-409b98df4dab"
 
+[[deps.DensityInterface]]
+deps = ["InverseFunctions", "Test"]
+git-tree-sha1 = "80c3e8639e3353e5d2912fb3a1916b8455e2494b"
+uuid = "b429d917-457f-4dbc-8f4c-0cc954292b1d"
+version = "0.4.0"
+
 [[deps.Distributions]]
-deps = ["FillArrays", "LinearAlgebra", "PDMats", "Printf", "QuadGK", "Random", "SparseArrays", "SpecialFunctions", "StaticArrays", "Statistics", "StatsBase", "StatsFuns"]
-git-tree-sha1 = "501c11d708917ca09ce357bed163dbaf0f30229f"
+deps = ["ChainRulesCore", "DensityInterface", "FillArrays", "LinearAlgebra", "PDMats", "Printf", "QuadGK", "Random", "SparseArrays", "SpecialFunctions", "Statistics", "StatsBase", "StatsFuns", "Test"]
+git-tree-sha1 = "74911ad88921455c6afcad1eefa12bd7b1724631"
 uuid = "31c24e10-a181-5473-b8eb-7969acd0382f"
-version = "0.23.12"
+version = "0.25.80"
 
 [[deps.DocStringExtensions]]
 deps = ["LibGit2"]
@@ -141,11 +554,23 @@ deps = ["ArgTools", "FileWatching", "LibCURL", "NetworkOptions"]
 uuid = "f43a241f-c20a-4ad4-852c-f6b1247861c6"
 version = "1.6.0"
 
+[[deps.DualNumbers]]
+deps = ["Calculus", "NaNMath", "SpecialFunctions"]
+git-tree-sha1 = "5837a837389fccf076445fce071c8ddaea35a566"
+uuid = "fa6b7ba4-c1ee-5f82-b5fc-ecf0adba8f74"
+version = "0.6.8"
+
 [[deps.Expat_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
 git-tree-sha1 = "bad72f730e9e91c08d9427d5e8db95478a3c323d"
 uuid = "2e619515-83b5-522b-bb60-26c02a35a201"
 version = "2.4.8+0"
+
+[[deps.FFMPEG]]
+deps = ["FFMPEG_jll"]
+git-tree-sha1 = "b57e3acbe22f8484b4b5ff66a7499717fe1a9cc8"
+uuid = "c87230d0-a227-11e9-1b43-d7ebe4e7570a"
+version = "0.4.1"
 
 [[deps.FFMPEG_jll]]
 deps = ["Artifacts", "Bzip2_jll", "FreeType2_jll", "FriBidi_jll", "JLLWrappers", "LAME_jll", "Libdl", "Ogg_jll", "OpenSSL_jll", "Opus_jll", "PCRE2_jll", "Pkg", "Zlib_jll", "libaom_jll", "libass_jll", "libfdk_aac_jll", "libvorbis_jll", "x264_jll", "x265_jll"]
@@ -157,10 +582,10 @@ version = "4.4.2+2"
 uuid = "7b1f6079-737a-58dc-b8bc-7a2ca5c1b5ee"
 
 [[deps.FillArrays]]
-deps = ["LinearAlgebra", "Random", "SparseArrays"]
-git-tree-sha1 = "502b3de6039d5b78c76118423858d981349f3823"
+deps = ["LinearAlgebra", "Random", "SparseArrays", "Statistics"]
+git-tree-sha1 = "9a0472ec2f5409db243160a8b030f94c380167a3"
 uuid = "1a297f60-69ca-5386-bcde-b61e274b549b"
-version = "0.9.7"
+version = "0.13.6"
 
 [[deps.FixedPointNumbers]]
 deps = ["Statistics"]
@@ -232,11 +657,16 @@ git-tree-sha1 = "344bf40dcab1073aca04aa0df4fb092f920e4011"
 uuid = "3b182d85-2403-5c21-9c21-1e1f0cc25472"
 version = "1.3.14+0"
 
+[[deps.Grisu]]
+git-tree-sha1 = "53bb909d1151e57e2484c3d1b53e19552b887fb2"
+uuid = "42e2da0e-8278-4e71-bc24-59509adca0fe"
+version = "1.0.2"
+
 [[deps.HTTP]]
 deps = ["Base64", "CodecZlib", "Dates", "IniFile", "Logging", "LoggingExtras", "MbedTLS", "NetworkOptions", "OpenSSL", "Random", "SimpleBufferStream", "Sockets", "URIs", "UUIDs"]
-git-tree-sha1 = "fd9861adba6b9ae4b42582032d0936d456c8602d"
+git-tree-sha1 = "eb5aa5e3b500e191763d35198f859e4b40fff4a6"
 uuid = "cd3eb016-35fb-5094-929b-558a96fad6f3"
-version = "1.6.3"
+version = "1.7.3"
 
 [[deps.HarfBuzz_jll]]
 deps = ["Artifacts", "Cairo_jll", "Fontconfig_jll", "FreeType2_jll", "Glib_jll", "Graphite2_jll", "JLLWrappers", "Libdl", "Libffi_jll", "Pkg"]
@@ -244,11 +674,11 @@ git-tree-sha1 = "129acf094d168394e80ee1dc4bc06ec835e510a3"
 uuid = "2e76f6c2-a576-52d4-95c1-20adfe4de566"
 version = "2.8.1+1"
 
-[[deps.Highlights]]
-deps = ["DocStringExtensions", "InteractiveUtils", "REPL"]
-git-tree-sha1 = "0341077e8a6b9fc1c2ea5edc1e93a956d2aec0c7"
-uuid = "eafb193a-b7ab-5a9e-9068-77385905fa72"
-version = "0.5.2"
+[[deps.HypergeometricFunctions]]
+deps = ["DualNumbers", "LinearAlgebra", "OpenLibm_jll", "SpecialFunctions", "Test"]
+git-tree-sha1 = "709d864e3ed6e3545230601f94e11ebc65994641"
+uuid = "34004b35-14d8-5ef3-9330-4cdb6864b03a"
+version = "0.3.11"
 
 [[deps.IniFile]]
 git-tree-sha1 = "f550e6e32074c939295eb5ea6de31849ac2c9625"
@@ -285,6 +715,12 @@ version = "0.1.1"
 git-tree-sha1 = "a3f24677c21f5bbe9d2a714f95dcd58337fb2856"
 uuid = "82899510-4779-5014-852e-03e436cf321d"
 version = "1.0.0"
+
+[[deps.JLFzf]]
+deps = ["Pipe", "REPL", "Random", "fzf_jll"]
+git-tree-sha1 = "f377670cda23b6b7c1c0b3893e37451c5c1a2185"
+uuid = "1019f520-868f-41f5-a6de-eb00f4b6a39c"
+version = "0.1.5"
 
 [[deps.JLLWrappers]]
 deps = ["Preferences"]
@@ -326,6 +762,12 @@ version = "2.10.1+0"
 git-tree-sha1 = "f2355693d6778a178ade15952b7ac47a4ff97996"
 uuid = "b964fa9f-0449-5b57-a5c2-d3ea65f4040f"
 version = "1.3.0"
+
+[[deps.Latexify]]
+deps = ["Formatting", "InteractiveUtils", "LaTeXStrings", "MacroTools", "Markdown", "OrderedCollections", "Printf", "Requires"]
+git-tree-sha1 = "2422f47b34d4b127720a18f86fa7b1aa2e141f29"
+uuid = "23fbe1c1-3f47-55db-b15f-69d7ec21a316"
+version = "0.15.18"
 
 [[deps.LibCURL]]
 deps = ["LibCURL_jll", "MozillaCACerts_jll"]
@@ -437,6 +879,11 @@ deps = ["Artifacts", "Libdl"]
 uuid = "c8ffd9c3-330d-5841-b78e-0817d7145fa1"
 version = "2.28.0+0"
 
+[[deps.Measures]]
+git-tree-sha1 = "c13304c81eec1ed3af7fc20e75fb6b26092a1102"
+uuid = "442fdcdd-2543-5da2-b0f3-8c86c306513e"
+version = "0.3.2"
+
 [[deps.Missings]]
 deps = ["DataAPI"]
 git-tree-sha1 = "f66bdc5de519e8f8ae43bdc598782d35a25b1272"
@@ -450,11 +897,11 @@ uuid = "a63ad114-7e13-5084-954f-fe012c677804"
 uuid = "14a3606d-f60d-562e-9121-12d972cd8159"
 version = "2022.2.1"
 
-[[deps.Mustache]]
-deps = ["Printf", "Tables"]
-git-tree-sha1 = "1e566ae913a57d0062ff1af54d2697b9344b99cd"
-uuid = "ffc61752-8dc7-55ee-8c37-f3e9cdd09e70"
-version = "1.0.14"
+[[deps.NaNMath]]
+deps = ["OpenLibm_jll"]
+git-tree-sha1 = "a7c3d1da1189a1c2fe843a3bfa04d18d20eb3211"
+uuid = "77ba4419-2d1f-58cd-9bb1-8ffee604a2e3"
+version = "1.0.1"
 
 [[deps.NetworkOptions]]
 uuid = "ca575930-c2e3-43a9-ace4-1e988b2c1908"
@@ -471,11 +918,16 @@ deps = ["Artifacts", "CompilerSupportLibraries_jll", "Libdl"]
 uuid = "4536629a-c528-5b80-bd46-f80d51c5b363"
 version = "0.3.20+0"
 
+[[deps.OpenLibm_jll]]
+deps = ["Artifacts", "Libdl"]
+uuid = "05823500-19ac-5b8b-9628-191a04bc5112"
+version = "0.8.1+0"
+
 [[deps.OpenSSL]]
 deps = ["BitFlags", "Dates", "MozillaCACerts_jll", "OpenSSL_jll", "Sockets"]
-git-tree-sha1 = "df6830e37943c7aaa10023471ca47fb3065cc3c4"
+git-tree-sha1 = "6503b77492fd7fcb9379bf73cd31035670e3c509"
 uuid = "4d8831e6-92b7-49fb-bdf8-b643e874388c"
-version = "1.3.2"
+version = "1.3.3"
 
 [[deps.OpenSSL_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
@@ -506,16 +958,21 @@ uuid = "efcefdf7-47ab-520b-bdef-62a2eaa19f15"
 version = "10.40.0+0"
 
 [[deps.PDMats]]
-deps = ["LinearAlgebra", "SparseArrays", "SuiteSparse", "Test"]
-git-tree-sha1 = "95a4038d1011dfdbde7cecd2ad0ac411e53ab1bc"
+deps = ["LinearAlgebra", "SparseArrays", "SuiteSparse"]
+git-tree-sha1 = "cf494dca75a69712a72b80bc48f59dcf3dea63ec"
 uuid = "90014a1f-27ba-587c-ab20-58faa44d9150"
-version = "0.10.1"
+version = "0.11.16"
 
 [[deps.Parsers]]
 deps = ["Dates", "SnoopPrecompile"]
-git-tree-sha1 = "6466e524967496866901a78fca3f2e9ea445a559"
+git-tree-sha1 = "8175fc2b118a3755113c8e68084dc1a9e63c61ee"
 uuid = "69de0a69-1ddd-5017-9359-2bf0b02dc9f0"
-version = "2.5.2"
+version = "2.5.3"
+
+[[deps.Pipe]]
+git-tree-sha1 = "6842804e7867b115ca9de748a0cf6b364523c16d"
+uuid = "b98c9c47-44ae-5843-9183-064241ee97a0"
+version = "1.3.0"
 
 [[deps.Pixman_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
@@ -527,6 +984,24 @@ version = "0.40.1+0"
 deps = ["Artifacts", "Dates", "Downloads", "LibGit2", "Libdl", "Logging", "Markdown", "Printf", "REPL", "Random", "SHA", "Serialization", "TOML", "Tar", "UUIDs", "p7zip_jll"]
 uuid = "44cfe95a-1eb2-52ea-b672-e2afdf69b78f"
 version = "1.8.0"
+
+[[deps.PlotThemes]]
+deps = ["PlotUtils", "Statistics"]
+git-tree-sha1 = "1f03a2d339f42dca4a4da149c7e15e9b896ad899"
+uuid = "ccf2f8ad-2431-5c83-bf29-c5338b663b6a"
+version = "3.1.0"
+
+[[deps.PlotUtils]]
+deps = ["ColorSchemes", "Colors", "Dates", "Printf", "Random", "Reexport", "SnoopPrecompile", "Statistics"]
+git-tree-sha1 = "5b7690dd212e026bbab1860016a6601cb077ab66"
+uuid = "995b91a9-d308-5afd-9ec6-746e21dbc043"
+version = "1.3.2"
+
+[[deps.Plots]]
+deps = ["Base64", "Contour", "Dates", "Downloads", "FFMPEG", "FixedPointNumbers", "GR", "JLFzf", "JSON", "LaTeXStrings", "Latexify", "LinearAlgebra", "Measures", "NaNMath", "Pkg", "PlotThemes", "PlotUtils", "Preferences", "Printf", "REPL", "Random", "RecipesBase", "RecipesPipeline", "Reexport", "RelocatableFolders", "Requires", "Scratch", "Showoff", "SnoopPrecompile", "SparseArrays", "Statistics", "StatsBase", "UUIDs", "UnicodeFun", "Unzip"]
+git-tree-sha1 = "a99bbd3664bb12a775cda2eba7f3b2facf3dad94"
+uuid = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
+version = "1.38.2"
 
 [[deps.PooledArrays]]
 deps = ["DataAPI", "Future"]
@@ -550,30 +1025,6 @@ version = "2.2.2"
 deps = ["Unicode"]
 uuid = "de0858da-6303-5e67-8744-51eddeeeb8d7"
 
-[[deps.ProgressBars]]
-deps = ["Printf"]
-git-tree-sha1 = "806ebc92e1b4b4f72192369a28dfcaf688566b2b"
-uuid = "49802e3a-d2f1-5c88-81d8-b72133a6f568"
-version = "1.4.1"
-
-[[deps.ProgressLogging]]
-deps = ["Logging", "SHA", "UUIDs"]
-git-tree-sha1 = "80d919dee55b9c50e8d9e2da5eeafff3fe58b539"
-uuid = "33c8b6b6-d38a-422a-b730-caa89a2f386c"
-version = "0.1.4"
-
-[[deps.PyCall]]
-deps = ["Conda", "Dates", "Libdl", "LinearAlgebra", "MacroTools", "Serialization", "VersionParsing"]
-git-tree-sha1 = "62f417f6ad727987c755549e9cd88c46578da562"
-uuid = "438e738f-606a-5dbb-bf0a-cddfbfd45ab0"
-version = "1.95.1"
-
-[[deps.PyPlot]]
-deps = ["Colors", "LaTeXStrings", "PyCall", "Sockets", "Test", "VersionParsing"]
-git-tree-sha1 = "f9d953684d4d21e947cb6d642db18853d43cb027"
-uuid = "d330b81b-6aea-500a-939a-2ce795aea3ee"
-version = "2.11.0"
-
 [[deps.Qt5Base_jll]]
 deps = ["Artifacts", "CompilerSupportLibraries_jll", "Fontconfig_jll", "Glib_jll", "JLLWrappers", "Libdl", "Libglvnd_jll", "OpenSSL_jll", "Pkg", "Xorg_libXext_jll", "Xorg_libxcb_jll", "Xorg_xcb_util_image_jll", "Xorg_xcb_util_keysyms_jll", "Xorg_xcb_util_renderutil_jll", "Xorg_xcb_util_wm_jll", "Zlib_jll", "xkbcommon_jll"]
 git-tree-sha1 = "0c03844e2231e12fda4d0086fd7cbe4098ee8dc5"
@@ -582,9 +1033,9 @@ version = "5.15.3+2"
 
 [[deps.QuadGK]]
 deps = ["DataStructures", "LinearAlgebra"]
-git-tree-sha1 = "97aa253e65b784fd13e83774cadc95b38011d734"
+git-tree-sha1 = "de191bc385072cc6c7ed3ffdc1caeed3f22c74d4"
 uuid = "1fd47b50-473d-5c70-9696-f719f8f3bcdc"
-version = "2.6.0"
+version = "2.7.0"
 
 [[deps.REPL]]
 deps = ["InteractiveUtils", "Markdown", "Sockets", "Unicode"]
@@ -594,6 +1045,18 @@ uuid = "3fa0cd96-eef1-5676-8a61-b3b8758bbffb"
 deps = ["SHA", "Serialization"]
 uuid = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 
+[[deps.RecipesBase]]
+deps = ["SnoopPrecompile"]
+git-tree-sha1 = "261dddd3b862bd2c940cf6ca4d1c8fe593e457c8"
+uuid = "3cdcf5f2-1ef4-517c-9805-6587b60abb01"
+version = "1.3.3"
+
+[[deps.RecipesPipeline]]
+deps = ["Dates", "NaNMath", "PlotUtils", "RecipesBase", "SnoopPrecompile"]
+git-tree-sha1 = "e974477be88cb5e3040009f3767611bc6357846f"
+uuid = "01d81517-befc-4cb6-b9ec-a95719d0359c"
+version = "0.6.11"
+
 [[deps.Reexport]]
 git-tree-sha1 = "45e428421666073eab6f2da5c9d310d99bb12f9b"
 uuid = "189a3867-3050-52da-a836-e630ba90ab69"
@@ -601,9 +1064,9 @@ version = "1.2.2"
 
 [[deps.RelocatableFolders]]
 deps = ["SHA", "Scratch"]
-git-tree-sha1 = "cdbd3b1338c72ce29d9584fdbe9e9b70eeb5adca"
+git-tree-sha1 = "90bc7a7c96410424509e4263e277e43250c05691"
 uuid = "05181044-ff0b-4ac5-8273-598c1e38db00"
-version = "0.1.3"
+version = "1.0.0"
 
 [[deps.Requires]]
 deps = ["UUIDs"]
@@ -648,15 +1111,22 @@ version = "1.1.1"
 [[deps.Serialization]]
 uuid = "9e88b42a-f829-5b0c-bbe9-9e923198166b"
 
+[[deps.Showoff]]
+deps = ["Dates", "Grisu"]
+git-tree-sha1 = "91eddf657aca81df9ae6ceb20b959ae5653ad1de"
+uuid = "992d4aef-0814-514b-bc4d-f2e9a6c4116f"
+version = "1.0.3"
+
 [[deps.SimpleBufferStream]]
 git-tree-sha1 = "874e8867b33a00e784c8a7e4b60afe9e037b74e1"
 uuid = "777ac1f9-54b0-4bf8-805c-2214025038e7"
 version = "1.1.0"
 
 [[deps.SnoopPrecompile]]
-git-tree-sha1 = "f604441450a3c0569830946e5b33b78c928e1a85"
+deps = ["Preferences"]
+git-tree-sha1 = "e760a70afdcd461cf01a575947738d359234665c"
 uuid = "66db9d55-30c0-4569-8b51-7e840670fc0c"
-version = "1.0.1"
+version = "1.0.3"
 
 [[deps.Sockets]]
 uuid = "6462fe0b-24de-5631-8697-dd941f90decc"
@@ -672,16 +1142,10 @@ deps = ["LinearAlgebra", "Random"]
 uuid = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 
 [[deps.SpecialFunctions]]
-deps = ["OpenSpecFun_jll"]
-git-tree-sha1 = "d8d8b8a9f4119829410ecd706da4cc8594a1e020"
+deps = ["ChainRulesCore", "IrrationalConstants", "LogExpFunctions", "OpenLibm_jll", "OpenSpecFun_jll"]
+git-tree-sha1 = "d75bda01f8c31ebb72df80a46c88b25d1c79c56d"
 uuid = "276daf66-3868-5448-9aa4-cd146d93841b"
-version = "0.10.3"
-
-[[deps.StaticArrays]]
-deps = ["LinearAlgebra", "Random", "Statistics"]
-git-tree-sha1 = "da4cf579416c81994afd6322365d00916c79b8ae"
-uuid = "90137ffa-7385-5640-81b9-e52037218182"
-version = "0.12.5"
+version = "2.1.7"
 
 [[deps.Statistics]]
 deps = ["LinearAlgebra", "SparseArrays"]
@@ -700,16 +1164,10 @@ uuid = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
 version = "0.33.21"
 
 [[deps.StatsFuns]]
-deps = ["ChainRulesCore", "InverseFunctions", "IrrationalConstants", "LogExpFunctions", "Reexport", "Rmath", "SpecialFunctions"]
-git-tree-sha1 = "5950925ff997ed6fb3e985dcce8eb1ba42a0bbe7"
+deps = ["ChainRulesCore", "HypergeometricFunctions", "InverseFunctions", "IrrationalConstants", "LogExpFunctions", "Reexport", "Rmath", "SpecialFunctions"]
+git-tree-sha1 = "ab6083f09b3e617e34a956b43e9d51b824206932"
 uuid = "4c63d2b9-4356-54db-8cca-17b64c39e42c"
-version = "0.9.18"
-
-[[deps.StringEncodings]]
-deps = ["Libiconv_jll"]
-git-tree-sha1 = "50ccd5ddb00d19392577902f0079267a72c5ab04"
-uuid = "69024149-9ee7-55f6-a4c4-859efe599b68"
-version = "0.3.5"
+version = "1.1.1"
 
 [[deps.StringManipulation]]
 git-tree-sha1 = "46da2434b41f41ac3594ee9816ce5541c6096123"
@@ -742,6 +1200,12 @@ deps = ["ArgTools", "SHA"]
 uuid = "a4e569a6-e804-4fa4-b0f3-eef7a1d5b13e"
 version = "1.10.1"
 
+[[deps.TensorCore]]
+deps = ["LinearAlgebra"]
+git-tree-sha1 = "1feb45f88d133a655e001435632f019a9a1bcdb6"
+uuid = "62fd8b95-f654-4bbd-a8a5-9c27f68ccd50"
+version = "0.1.1"
+
 [[deps.Test]]
 deps = ["InteractiveUtils", "Logging", "Random", "Serialization"]
 uuid = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
@@ -764,10 +1228,16 @@ uuid = "cf7118a7-6976-5b1a-9a39-7adc72f591a4"
 [[deps.Unicode]]
 uuid = "4ec0a83e-493e-50e2-b9ac-8f72acf5a8f5"
 
-[[deps.VersionParsing]]
-git-tree-sha1 = "58d6e80b4ee071f5efd07fda82cb9fbe17200868"
-uuid = "81def892-9a0e-5fdd-b105-ffc91e053289"
-version = "1.3.0"
+[[deps.UnicodeFun]]
+deps = ["REPL"]
+git-tree-sha1 = "53915e50200959667e78a92a418594b428dffddf"
+uuid = "1cfade01-22cf-5700-b092-accc4b62d6e1"
+version = "0.4.1"
+
+[[deps.Unzip]]
+git-tree-sha1 = "ca0969166a028236229f63514992fc073799bb78"
+uuid = "41fe7b60-77ed-43a1-b4f0-825fd5a5650d"
+version = "0.2.0"
 
 [[deps.Wayland_jll]]
 deps = ["Artifacts", "Expat_jll", "JLLWrappers", "Libdl", "Libffi_jll", "Pkg", "XML2_jll"]
@@ -786,12 +1256,6 @@ deps = ["DataAPI", "InlineStrings", "Parsers"]
 git-tree-sha1 = "b1be2855ed9ed8eac54e5caff2afcdb442d52c23"
 uuid = "ea10d353-3f73-51f8-a26c-33c1cb351aa5"
 version = "1.4.2"
-
-[[deps.Weave]]
-deps = ["Base64", "Dates", "Highlights", "JSON", "Markdown", "Mustache", "Pkg", "Printf", "REPL", "RelocatableFolders", "Requires", "Serialization", "YAML"]
-git-tree-sha1 = "6000515f13412fe1887792fbe1dc9306112af2ff"
-uuid = "44d3d7a6-8a23-5bf8-98c5-b353f8df5ec9"
-version = "0.10.11"
 
 [[deps.XML2_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Libiconv_jll", "Pkg", "Zlib_jll"]
@@ -931,12 +1395,6 @@ git-tree-sha1 = "79c31e7844f6ecf779705fbc12146eb190b7d845"
 uuid = "c5fb5394-a638-5e4d-96e5-b29de1b5cf10"
 version = "1.4.0+3"
 
-[[deps.YAML]]
-deps = ["Base64", "Dates", "Printf", "StringEncodings"]
-git-tree-sha1 = "dbc7f1c0012a69486af79c8bcdb31be820670ba2"
-uuid = "ddb6d928-2868-570f-bddf-ab3f9cf99eb6"
-version = "0.4.8"
-
 [[deps.Zlib_jll]]
 deps = ["Libdl"]
 uuid = "83775a58-1f1d-513f-b197-d71354ab007a"
@@ -947,6 +1405,12 @@ deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
 git-tree-sha1 = "e45044cd873ded54b6a5bac0eb5c971392cf1927"
 uuid = "3161d3a3-bdf6-5164-811a-617609db77b4"
 version = "1.5.2+0"
+
+[[deps.fzf_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
+git-tree-sha1 = "868e669ccb12ba16eaf50cb2957ee2ff61261c56"
+uuid = "214eeab7-80f7-51ab-84ad-2988db7cef09"
+version = "0.29.0+0"
 
 [[deps.libaom_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
@@ -1010,3 +1474,29 @@ deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg", "Wayland_jll", "Wayland_prot
 git-tree-sha1 = "9ebfc140cc56e8c2156a15ceac2f0302e327ac0a"
 uuid = "d8fb68d0-12a3-5cfd-a85a-d49703b185fd"
 version = "1.4.1+0"
+"""
+
+# ╔═╡ Cell order:
+# ╠═48eee69f-1ae2-438c-8816-d76aea8f85a4
+# ╟─4951c40d-e08c-48f5-a364-63a76a00133a
+# ╟─4a54a800-990d-11ed-31f8-ff5066c0c38e
+# ╟─5a710a7d-4687-4df7-a9d9-c9c828c9afab
+# ╟─6e655d43-9611-4a9d-8ccb-fe92d6bea6c3
+# ╟─2aa72e33-48f3-4604-9888-eb426f3450c6
+# ╠═ed5e8997-a2c6-4aaa-b239-b4b018752e80
+# ╟─1d39b66b-44c4-47f9-a3ce-e0829389eac7
+# ╟─b71b2e33-1ef5-4af6-bb34-2fbb9a70b6a5
+# ╟─a330541c-f668-4e6d-b2ea-4378be5446d9
+# ╟─61b3023b-4e9e-42e9-ad66-ce029af65b70
+# ╟─7638877a-9be3-4d22-a8fd-e14626f43d6d
+# ╠═08a22f71-628b-479c-81e9-69206f6496a0
+# ╟─b050c890-0597-4d07-add4-4160880becce
+# ╟─4029d6bf-87ed-4b95-a2db-25762b2a3cfb
+# ╟─071091ef-0ecc-4c66-8483-12f12dc8a342
+# ╟─a75d8729-a325-48db-bce9-dc236cd3dced
+# ╟─f0739ce2-34b3-469c-ad81-f284c28a377b
+# ╟─70699a58-9666-446a-899e-4af79b3ea3d1
+# ╟─7926d70f-f960-41e1-b1d4-79b293e0ba89
+# ╟─d7a129c2-2c7b-4e01-b850-66f3ec784d2a
+# ╟─00000000-0000-0000-0000-000000000001
+# ╟─00000000-0000-0000-0000-000000000002

@@ -1,6 +1,4 @@
-using Pkg
-Pkg.activate(".")
-using Distributions, StatsBase, Random, DataFrames, Tables, SQLite
+using Distributions, Plots, Statistics, StatsBase, Random, DataFrames, Tables, SQLite, ProgressLogging, StatsPlots
 
 ############################ Key Assumptions ###################
 # Individuals start with shared uniform distribution over proportions of accept/reject
@@ -38,6 +36,7 @@ mutable struct Agent
                                 # Values closer to zero denote weaker directional preferences. A 0 means you get no utility from accept|A or R|R and you only care about avoiding minority. 
     decision::Int               # What does agent ultimately state: 1 = accept, 2 = reject
     utility::Float16            # Final utility of agent
+    beliefAccept::Float32       # Belief agent encounters that the group will accept
 end
 
 mutable struct Society
@@ -69,7 +68,7 @@ function init(N, minorityCost, randomSeq, propPref, binomialBeliefs)
     prefs = [Distributions.Uniform(-1, 0), Distributions.Normal(0, 0), Distributions.Uniform(0, 1)] # Three classes of agents - reject (-1,0), unsure (0), approval (0, 1)
     
     # 2. Populate with N agents
-    agents = [Agent(i, rand(StatsBase.wsample(prefs, Weights(propPref)) ), 0, 0.0) for i in 1:N] # ID, preference, NO DECISION YET, NOR UTILITY
+    agents = [Agent(i, rand(StatsBase.wsample(prefs, Weights(propPref)) ), 0, 0.0, .5) for i in 1:N] # ID, preference, NO DECISION YET, NOR UTILITY, belief (init to .5)
     
     # 3. Initialize sequence of performances
     utilsTransformed = abs.(getfield.(agents, :utilAccept)) .+ .001 # Calculate distance from 0 with small amount added to permit sampling of unsure individuals
@@ -103,8 +102,9 @@ end
     4. Assign utility
 """
 function iterate!(soc::Society)
-    df = DataFrame(Agent = Int64[], AlphaBefore = Int64[], BetaBefore = Int64[], uAA = Float16[], statement = Int64[] , AlphaAfter = Int64[], BetaAfter = Int64[])
+    df = DataFrame(Agent = Int64[], AlphaBefore = Int64[], BetaBefore = Int64[], uAA = Float16[], statement = Int64[] , AlphaAfter = Int64[], BetaAfter = Int64[], MinorityCost = Float16[], BeliefAccept = Float32[], Threshold = Float32[], UtilMinusThreshold = Float32[], SeqPosition = Int64[])
     # Iterate through agents
+    sequence_counter = 1
     for agent in soc.agents
 
         # 1. Decision contingency
@@ -114,13 +114,14 @@ function iterate!(soc::Society)
         b = soc.sharedBeliefs[2] # Number rejects
         # First check if previous performances and nature of beliefs - binomial or not
         if soc.binomialBeliefs
-            mode_accept = ifelse(a > 1 && b > 1, (a-1)/(a+b-2), 1/2)
+            mode_accept = ifelse(a == 1 && b == 1, 1/2, (a-1)/(a+b-2)) # If both params are 1, we have a uniform.
             mode_reject = 1-mode_accept
         else
             c = soc.N - a - b                                                      # Number of remaining, undecided individuals
-            mode_accept = ifelse(a > 1 && b > 1 && c > 1, (a-1)/(a+b+c-3), 1/3)    # If a, b, c are all 1 then it's a uniform distribution and 1/3 is the best you'll do
-            mode_reject = ifelse(a > 1 && b > 1 && c > 1, (b-1)/(a+b+c-3), 1/3)    # If a, b, c are all 1 then it's a uniform distribution and 1/3 is the best you'll do
+            mode_accept = ifelse(a == 1 && b > 1 && c == 1, 1/3, (a-1)/(a+b+c-3))    # If a, b, c are all 1 then it's a uniform distribution and 1/3 is the best you'll do
+            mode_reject = ifelse(a == 1 && b == 1 && c == 1, 1/3, (b-1)/(a+b+c-3))    # If a, b, c are all 1 then it's a uniform distribution and 1/3 is the best you'll do
         end
+        agent.beliefAccept = mode_accept
         # Each agent compares the utility of accepting or rejecting given beliefs which is a coordination game with the majority coalition
         # Utility of stating accept is the preference for accept * prob accept - cost of minority * probability reject (because focal agent stated accept)
         U_A = agent.utilAccept*mode_accept - soc.minorityCost*mode_reject
@@ -150,8 +151,12 @@ function iterate!(soc::Society)
             soc.sharedBeliefs[3] -= 1
         end
         
-        # 3. Fill in Df with agent ID, AlphaBefore, BetaBefore, utilAccept, decision, AlphaAfter, BetaAfter
-        push!(df, Dict(:Agent => agent.id, :AlphaBefore => a, :BetaBefore => b, :uAA => agent.utilAccept, :statement => agent.decision, :AlphaAfter => soc.sharedBeliefs[1], :BetaAfter => soc.sharedBeliefs[2]))
+        Threshold = (1/2)*(1-agent.utilAccept/soc.minorityCost)
+        UtilMinusThreshold = agent.utilAccept - soc.minorityCost*(1-2*agent.beliefAccept)
+        # 3. Fill in Df with agent ID, AlphaBefore, BetaBefore, utilAccept, decision, AlphaAfter, BetaAfter, minorityCost, and belief (for ease)
+        push!(df, Dict(:Agent => agent.id, :AlphaBefore => a, :BetaBefore => b, :uAA => agent.utilAccept, :statement => agent.decision, :AlphaAfter => soc.sharedBeliefs[1], :BetaAfter => soc.sharedBeliefs[2], :MinorityCost => soc.minorityCost, :BeliefAccept => agent.beliefAccept, :Threshold => Threshold, :UtilMinusThreshold => UtilMinusThreshold, :SeqPosition => sequence_counter))
+
+        sequence_counter += 1
     end
     
     # 4. Assign utility
@@ -178,6 +183,16 @@ function iterate!(soc::Society)
     # Transfer agents' utilities to easily accessible vector
     soc.utilities = getfield.(soc.agents, :utility) 
 
+    # set majority so I know
+    df.FinalProportion .= proportionAccept
+    # 
+    if proportionAccept > .5
+        df.FinalOutcome .= 1
+    elseif proportionAccept < .5
+        df.FinalOutcome .= -1
+    else
+        df.FinalOutcome .= 0
+    end
     # Return data frame
     return df
 end
@@ -222,6 +237,7 @@ function run(gens, N, minorityCost, randomSeq, propPref, binomialBeliefs, tableN
     end
     return df
 end
+df = run(1000, 40, .7, false, [.3, .5, .2], true, nothing)
 
 # society = init(20, .8, false, [.3, .4, .3], false)
 # test = iterate!(society)
@@ -243,3 +259,164 @@ end
 # histogram(g; bins = -1.1:.05:1.1)
 # print(mean(society.utilities))
 
+############################################ Helper Functions ############################################
+##### Plotting 
+
+"""
+    Function plots beliefs across universes. Plots a proportion of them with a given transparency (alpha value) then plots the average conditioned on which majority wins as well as the marginalized average. 
+    User supplies DF of simulated data output by run function previously defined, where each row is a society member's decision and alpha values, proportion of conditional distributions to plot, and whether or not the proportion refers to marginal or conditional distributions as well as other kwargs
+    Function groups into outcomes (if alpha > beta, majority is ACCEPT else majority is REJECT)
+    In conditional plots, function also shows the average belief an individual at that position in the sequence must have to make an accept or reject decision. This is found by calculating c(1-2p) for each agent, the threshold that must be exceeded to state ACCEPT publicly. It then plots a distribution of U_AA^i-c(1-2p^i) where U_AA^i is the ith agent's utility to ACCEPT conditional on the group accepting and p^i is there belief the these for a sample of agents at that position in the sequence.
+"""
+function plotting_function(df; useralpha = .3, proportion = .01, marginalproportion = true)
+    # Take in data frame where each row is a universe/society, agent tuple. 
+    # Get community size, N
+    N = DataFrames.nrow(filter(x -> x.Gen == 1, df))
+    # Get number of universes run
+    Gens = maximum(df.Gen) 
+    
+    # Iterate through each universe, pull out sequence of beliefs, outcomes, final outcome, utility, and cost and store as named tuple in array
+    seqOutcome = []
+    
+
+    @progress for univ_iter in 1:Gens # Iterate through each generation
+        # Filter dataframe to given universe
+        tempDF = df[df.Gen .== univ_iter, :]
+        
+        # Pull out sequence of statements
+        # Identify majority
+        majorityAccept = sum(tempDF.statement .== 1)/N
+
+        # Store named tuple of majorityAccept, AlphaBefore, BetaBefore, statements into array
+        push!(seqOutcome, (majority = majorityAccept, alphas = tempDF.AlphaBefore, betas = tempDF.BetaBefore, statement = tempDF.statement, cost = tempDF.MinorityCost, utility = tempDF.uAA, modalBelief = tempDF.BeliefAccept, Threshold = tempDF.Threshold, UtilMinusThreshold = tempDF.UtilMinusThreshold))
+    end
+    # Now have array of each society's outcome, trajectory of beliefs, decisions, utility of the agent making that decision, and the cost associated with the minority
+       
+    # Separate out accepts, rejects, and unsures for ease
+    accepts = filter(x -> x.majority > .5, seqOutcome)
+    rejects = filter(x -> x.majority < .5, seqOutcome)
+
+    # Construct named tuple that has marginal and conditioned average beliefs and Threshold
+    if length(accepts) != 0
+        Accepts_beliefAverage = mean(map(x -> x.modalBelief, accepts)) 
+        Accepts_thresholdAverage = mean(map(x -> x.Threshold, accepts))
+    else
+        Accepts_beliefAverage = NaN
+        Accepts_thresholdAverage = NaN
+    end
+    if length(rejects) != 0
+        Rejects_beliefAverage = mean(map(x -> x.modalBelief, rejects))
+        Rejects_thresholdAverage = mean(map(x -> x.Threshold, rejects))
+
+    else
+        Rejects_beliefAverage = NaN
+        Rejects_thresholdAverage = NaN
+    end
+
+    beliefsAverage = (
+                        beliefAverage = mean(map(x -> x.modalBelief, seqOutcome)), 
+                        thresholdAverage = mean(map(x -> x.Threshold, seqOutcome)),
+
+                        # Conditioned on majority Accept
+                        Accepts_beliefAverage = Accepts_beliefAverage, 
+                        Accepts_thresholdAverage = Accepts_thresholdAverage,
+                        
+
+                        # Conditioned on majority Reject
+                        Rejects_beliefAverage = Rejects_beliefAverage, 
+                        Rejects_thresholdAverage = Rejects_thresholdAverage
+    ) 
+
+
+    # Pull out threshold sequence for each universe (array of sequences)
+    # N x Gens matrix, each column is a series of thresholds
+    thresholdsOverall = hcat(map(x -> x.Threshold, seqOutcome)...) 
+    # Pull out belief sequence for each universe (array of sequences)
+    # N x Gens matrix, each column is a series of modal beliefs (N long)
+    beliefsOverall = hcat(map(x -> x.modalBelief, seqOutcome)...)
+    beliefsThreshDif_Overall = thresholdsOverall - beliefsOverall
+
+    # Do same for accept and reject subgroups
+    # Accepts
+    thresholdsAccept =  hcat(map(x -> x.Threshold, accepts)...)
+    beliefsAccept = hcat(map(x -> x.modalBelief, accepts)...)
+    beliefsThreshDif_Accepts = thresholdsAccept - beliefsAccept
+    # Rejects
+    thresholdsReject =  hcat(map(x -> x.Threshold, rejects)...)
+    beliefsReject = hcat(map(x -> x.modalBelief, rejects)...)
+    beliefsThreshDif_Rejects = thresholdsReject - beliefsReject
+
+    # Now have distribution of threshold values, beliefs, and the difference between them for each agent position across all universes in ≤N x Gens matrices
+    ########################## Plots ##########################
+    ########### Avg and Conditional Beliefs Trajectory
+    ###### Avg plot (1)
+    # Plot will be a (2,1) with the top plot showing the average marginal beliefs and the bottom plot conditioning on accept and reject
+
+    # Sample user-provided proportion outcomes to plot
+    selectedOutcomes = sample(seqOutcome, round(Int64, proportion*Gens))
+    # Construct vector of proportion ACCEPT beliefs (p in the model)
+    propAccept = map(x -> x.modalBelief, selectedOutcomes) 
+    # Concatenate into matrix (columns are series) 
+    propAcceptMatrix = hcat(propAccept...)
+        # Open plot named overall
+    # Add sampled series with user-provided alpha
+
+    overall = plot(propAcceptMatrix, label = :none, alpha = useralpha, linestyle = :dash, linecolor = :gray,
+        title = "Average Modal Beliefs Trajectory")
+
+    # Horizontal line at .5 for reference (.5 separates ACCEPT and REJECT beliefs)
+    hline!(overall, [.5], linewidth = 2, color = :gray, alpha = 1.0, label = "") 
+    # Add series for average beliefs overall (not sampled)
+    plot!(overall, beliefsAverage.beliefAverage, linewidth = 5, color = :black, label = "Average Modal Beliefs") 
+
+    ##### Conditional Plot (2)
+    # Open plot named conditional
+    conditional = plot(title = "Average Modal Beliefs Grouped by Outcome"); 
+
+    # Plot sequence of marginal average accept beliefs for ACCEPT outcome
+    plot!(conditional, beliefsAverage.Accepts_beliefAverage, color = :blue, linewidth = 5, label = "Ultimately Accepts") 
+    # Plot sequence of marginal accept average beliefs for REJECT outcome 
+    plot!(conditional, beliefsAverage.Rejects_beliefAverage, color = :red, linewidth = 5, label = "Ultimately Rejects") 
+    # Plot horizontal line at .5 for reference
+    hline!(conditional, [.5], linewidth = 2, color = :gray, label = "") 
+
+    # Is proportion overall or of conditional distributions (to ensure you see some sample)
+    if marginalproportion # If marginalproportion (user supplied), then the sampling of trajectories has already been taken
+        selectedAccepts = filter(x -> x.majority > .5, selectedOutcomes) # Pull out accepts
+        selectedRejects = filter(x -> x.majority < .5, selectedOutcomes) # Pull out accepts
+        
+    else # If not, then I need to condition on accepts/rejects
+        selectedAccepts = sample(accepts, round(round(Int64, proportion*Gens)))
+        selectedRejects = sample(rejects, round(round(Int64, proportion*Gens))) 
+    end
+
+    # Pull out beliefs
+    # Accept beliefs for ACCEPT outcomes (should generally be > .5)
+    propAccept_selectedAccepts = map(x -> x.modalBelief, selectedAccepts) 
+    # Accept beliefs for REJECT outcomes (should generally be < .5)
+    propAccept_selectedRejects = map(x -> x.modalBelief, selectedRejects) 
+    propAcceptMatrix_Accepts = hcat(propAccept_selectedAccepts...) # Stick together into column matrix
+    propAcceptMatrix_Rejects = hcat(propAccept_selectedRejects...) # Stick together into column matrix
+
+    # Plot sample of conditioned trajectories
+    plot!(conditional, propAcceptMatrix_Accepts, color = :blue, alpha = useralpha, linestyle = :dot, label = "") # ACCEPT distribution in blue, dotted
+    plot!(conditional, propAcceptMatrix_Rejects, color = :red, alpha = useralpha, linestyle = :dash, label = "") # REJECT distribution in red, dashed
+    
+    # Construct AvgCondPlot (pane1)
+    AvgCondPlot = plot(overall, conditional, layout=(2,1), size = (650, 700))
+
+    ########### Threshold-Beliefs Plot
+
+    df.OutcomeString .= ifelse.(df.FinalOutcome .== 1, "Ultimately Accepts", "Ultimately Rejects")
+    df.OutcomeColor.= ifelse.(df.FinalOutcome .== 1, "blue", "red")
+
+    pyplot()
+    plot2 = groupedboxplot(df.SeqPosition, df.Threshold.-df.BeliefAccept, group = df.OutcomeString, color = [:red :blue], title = "Distribution of Threshold Beliefs - Actual Beliefs")
+    
+    # plot(beliefsAverage.Accepts_thresholdAverage, color = :blue, linestyle = :dash, linewidth = 3, label = "Average Threshold for Accepts")
+    # plot!(beliefsAverage.Rejects_thresholdAverage, color = :red, linestyle = :dash, linewidth = 3, label = "Average Threshold for Rejects")
+    # plot!(beliefsAverage.Accepts_beliefAverage, color = :blue, linewidth = 3, label = "Average Beliefs for Accepts") 
+    # # Plot sequence of marginal accept average beliefs for REJECT outcome 
+    # plot!(beliefsAverage.Rejects_beliefAverage, color = :red, linewidth = 3, label = "Average Beliefs for Rejects") 
+    return (AvgCondPlot, plot2)
+end
