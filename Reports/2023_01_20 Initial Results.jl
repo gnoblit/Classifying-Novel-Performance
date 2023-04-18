@@ -1,11 +1,11 @@
 ### A Pluto.jl notebook ###
-# v0.19.20
+# v0.19.22
 
 using Markdown
 using InteractiveUtils
 
 # ╔═╡ 48eee69f-1ae2-438c-8816-d76aea8f85a4
-using Plots, Distributions, StatsBase, Random, DataFrames, Tables, SQLite; include("../Code/Model 1/Try 1.jl");
+using Plots, Distributions, StatsBase, Random, DataFrames, Tables, SQLite, StatsPlots, ProgressLogging, PyPlot; include("../Code/Model 1/Try 1.jl");
 
 # ╔═╡ 4951c40d-e08c-48f5-a364-63a76a00133a
 md"""
@@ -16,30 +16,33 @@ md"""
 md"
 Groups of size ``N``
 
-Unclassified behavior has occurred that group must classify as normative (``1``) or norm-breaking (``-1``).
+New behavior is proposed (new, alternative rule to status-quo: women can go out without escort, innovation in a pre-existing punishment technology or food-production technology that breaks pre-existing norm). The group must classify this new rule as normatively acceptable (``1``) or normatively unacceptable and deserving of punishment (``-1``).
 
-Agents have opportunity to publicly state whether they ACCEPT or REJECT the behavior as normative. 
-
-Majority rule ultimately decides how group will classify the novel performance.
-
-Agents possess preferences over three things depending on how the group ultimately comes to classify the behavior:
-- ``U(A|A)``, the utility of stating ACCEPT given that the group accepts
-- ``U(R|R)``, the utility of stating REJECT given that the group rejects.
-- ``U(A|R) = U(R|A)``, the utility of miscoordinating with the group (stating A when group comes to R and vice versa).
-- For all agents, the miscoordinating cost ``= c``.
+Agents have opportunity to publicly state whether they ACCEPT or REJECT the behavior as normative. This is all they control. Majority rule ultimately decides how group will classify the novel performance.
 
 Three classes of agents exist with distinct preference orderings
-- DOs: ``U(A|A) > U(R|R)``; ``U(A|A)`` is drawn from a uniform distribution defined for ``(0,1)``. ``U(R|R) = -U(A|A)``
-- DON'Ts: ``U(R|R) > U(A|A)``; ``U(R|R)`` is drawn from a uniform distribution defined for ``(-1,0)``. ``U(R|R) = -U(A|A)``
-- UNSURES: ``U(A|A) = U(R|R) = 0``
+- DOs: These agents prefer the new rule be implemented, such as a new technique for fletching arrows. The current rule imposes costs on them. If the group implements the new rule, they receive an increase in payoff given by ``b_n``. If the group maintains the status quo they receive a payoff of ``-c_{sq}``. ``b_n`` might be understood as the utility individuals experience because of a new, more productive technology is implemented or a new rule that grants this group additional rights or even privileges. The cost, ``c_{sq}``, is the disutility of the status quo, such as might occur if individuals have to pay customary dues or the status quo entails some disutility. 
+- DON'Ts: These agents gain some benefit from the status quo and prefer the group to REJECT. If the group rejects the new rule and maintains the status quo, they receive a payoff of ``b_{sq}``. If the group adopts the new rule and maintains the status quo, they lose out on these benefits and experience ``-c_{n}``
+- UNSURES: These individuals are not aware of how they will be impacted by what decision the group comes to (even if there are benefits or costs to the new rule to them). They only consider coordination when they make their decision and possess no preferences over the rules. 
+
+All individuals face a cost ``-c_m`` if they state ACCEPT and the group ultimately REJECTS and vice versa. 
+
+**NO PAYOFF TO DISCOURSE (agents are not motivated to state their opinion per se)**. As it stands, agents have no incentive to state their true preference or combine their true preference with other considerations. 
 
 Individuals do not choose when they state ACCEPT or REJECT. Sequence ordering occurs either randomly or where position is proportionate to the magnitude of one's preferences with agents with preferences closer to ``1, -1`` going earlier in sequence. This occurs stochastically.
 - Seeks to model that UNSUREs are mostly concerned about coordinating with the group, which means they want to hang back and understand what outcome is most likely to occur before they make a public statement. 
 
-- Utility of stating ACCEPT defined as ``pU(A|A) - (1-p)c`` where ``p`` is individual ``i``'s belief over the proportion of group that states ACCEPT.
-- Utility of stating REJECT defined as ``(1-p)U(R|R) - pc``.
-- Agent picks larger. If utilities are random, agent selects their larger true preference (``U(A|A)`` or ``U(R|R)``)
-- ``p`` begins as a shared Beta prior, initially uniform, over the proportion of the group that will state ACCEPT. This belief is updated sequentially as individuals make their statements.
+Utility of stating ACCEPT
+- For *Do's*: ``pb_n - (1-p)(c_{sq} + c_m)``: where ``p`` is individual ``i``'s belief over the proportion of group that will state ACCEPT. With probability ``p`` the agent believes the group will come to accept the new rule, earning her ``b_n``. However, with probability ``1-p`` the agent will have miscoordinated with the group (``-c_m``) and because the group rejects, the harmful status-quo will have been maintained ``c_{sq}``.
+- For *Don'ts*: ``-pc_n + (1-p)(b_{sq}-c_m)``:  With probability ``p`` the agent believes the group will come to accept the new rule, earning her ``-c_n``. However, with probability ``1-p`` the agent will have miscoordinated with the group (``-c_m``) but the beneficial status-quo will have been maintained ``b_{sq}``.
+- For *Unsures*: ``-(1-p)c_m``: With probability ``p`` the agent believes the group will accept, but she perceives no benefit or cost to the new rule, earning her a payoff of ``0``. She believes the group will reject the new rule with probability ``1-p`` leading her to incur a miscoordination cost. 
+Utility of stating REJECT
+- For *Do's*: ``p(b_n - c_m)-(1-p)c_{sq}``: With probability ``p`` the agent believes the group will end up accepting, which would incur them a cost to being in the minority along with the benefit of the new rule. With probability ``1-p``, the status quo is enforced and individuals only face the cost of experiencing the old-rule. 
+- For *Don'ts*: ``- p(c_n + c_m) + (1-p)b_{sq}``: The agent believes that the group will accept with probability ``p``, leading to a miscoordination cost and the unpreferred rule cost; with probability ``1-p`` she believes the group will reject the new rule leading her to continue to experience the benefits associated with the status-quo.
+- For *Unsures*: ``-pc_m``
+Agent picks action over whichever utility is larger. If utilities are equal, agent selects ACCEPT if they're a *Do* and REJECT if they're a *Don't* under the assumption that they might influence others.
+
+``p`` begins as a shared Beta prior, initially uniform, over the proportion of the group that will state ACCEPT. This belief is updated sequentially as individuals make their statements.
 "
 
 # ╔═╡ 5a710a7d-4687-4df7-a9d9-c9c828c9afab
@@ -372,23 +375,46 @@ md"""
 > Same as previous figure but sequencing is now random.
 """
 
+# ╔═╡ 6b5b485d-6838-4f72-a1b3-16890d4c1984
+md"""
+# Future Directions
+
+I can imagine the miscoordination cost being different for whether the status-quo or new-rule group wins.
+
+The model is set up in a very collective-decision-making sense. Everyone gets together and observes a sequential public signal. What is far more realistic is that beliefs are updated more locally and conditional on a network structure. We don't get together as a society and decide on punishment or policy generally. Instead, the 'bubbling up' process looks more like 
+
+How a classifier comes to its decision does a lot of work of determining what behaviors/equilibrium will or can be stabilized, i.e. what punishing coalitions can be sustained. 
+	
+* Imagine there's two possible outcomes: $1$ which would provide men and women with $b_1$ and $0$ which would provide men with $b_2 > b_1$ and women with $0$. If the classification process reflects males' preferences only vs. men and women, we'd see distinct outcomes. 
+	
+* Classification outcomes (logic that generates a sequence) can be related to my interests and values (speak a vocabulary that I am familiar with). I can preferentially pay attention to one classifier over another. In small scale societies, there are many classifiers - individuals who offer dispute resolution. 
+
+Classifier may compete with other classifiers - would require classifier setting 'price' for its services. It's logic may conform to the interests of some subset of the community based on how they value the equilibrium, whether they can afford the cost, what the endogenized cost is, etc. 
+"""
+
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
 [deps]
 DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
 Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
 Plots = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
+ProgressLogging = "33c8b6b6-d38a-422a-b730-caa89a2f386c"
+PyPlot = "d330b81b-6aea-500a-939a-2ce795aea3ee"
 Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 SQLite = "0aa819cd-b072-5ff4-a722-6bc24af294d9"
 StatsBase = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
+StatsPlots = "f3b207a7-027a-5e70-b257-86293d7955fd"
 Tables = "bd369af6-aec1-5ad0-b16a-f7cc5008161c"
 
 [compat]
 DataFrames = "~1.4.4"
 Distributions = "~0.25.80"
 Plots = "~1.38.2"
+ProgressLogging = "~0.1.4"
+PyPlot = "~2.11.0"
 SQLite = "~1.6.0"
 StatsBase = "~0.33.21"
+StatsPlots = "~0.15.4"
 Tables = "~1.10.0"
 """
 
@@ -396,16 +422,46 @@ Tables = "~1.10.0"
 PLUTO_MANIFEST_TOML_CONTENTS = """
 # This file is machine-generated - editing it directly is not advised
 
-julia_version = "1.8.2"
+julia_version = "1.8.1"
 manifest_format = "2.0"
-project_hash = "38703a705459d2de9dea8aa9c2370b4db8c352f9"
+project_hash = "275ebbeba6a5525189d7710c1d0a3be5690f3ddc"
+
+[[deps.AbstractFFTs]]
+deps = ["ChainRulesCore", "LinearAlgebra"]
+git-tree-sha1 = "69f7020bd72f069c219b5e8c236c1fa90d2cb409"
+uuid = "621f4979-c628-5d54-868e-fcf4e3e8185c"
+version = "1.2.1"
+
+[[deps.Adapt]]
+deps = ["LinearAlgebra"]
+git-tree-sha1 = "0310e08cb19f5da31d08341c6120c047598f5b9c"
+uuid = "79e6a3ab-5dfb-504d-930d-738a2a938a0e"
+version = "3.5.0"
 
 [[deps.ArgTools]]
 uuid = "0dad84c5-d112-42e6-8d28-ef12dabb789f"
 version = "1.1.1"
 
+[[deps.Arpack]]
+deps = ["Arpack_jll", "Libdl", "LinearAlgebra", "Logging"]
+git-tree-sha1 = "9b9b347613394885fd1c8c7729bfc60528faa436"
+uuid = "7d9fca2a-8960-54d3-9f78-7d1dccf2cb97"
+version = "0.5.4"
+
+[[deps.Arpack_jll]]
+deps = ["Artifacts", "CompilerSupportLibraries_jll", "JLLWrappers", "Libdl", "OpenBLAS_jll", "Pkg"]
+git-tree-sha1 = "5ba6c757e8feccf03a1554dfaf3e26b3cfc7fd5e"
+uuid = "68821587-b530-5797-8361-c406ea357684"
+version = "3.5.1+1"
+
 [[deps.Artifacts]]
 uuid = "56f22d72-fd6d-98f1-02f0-08ddc0907c33"
+
+[[deps.AxisAlgorithms]]
+deps = ["LinearAlgebra", "Random", "SparseArrays", "WoodburyMatrices"]
+git-tree-sha1 = "66771c8d21c8ff5e3a93379480a2307ac36863f7"
+uuid = "13072b0f-2c55-5437-9ae7-d433b7a33950"
+version = "1.0.1"
 
 [[deps.Base64]]
 uuid = "2a0f44e3-6c83-55bd-87e4-b1978d98bd5f"
@@ -444,6 +500,12 @@ deps = ["ChainRulesCore", "LinearAlgebra", "Test"]
 git-tree-sha1 = "38f7a08f19d8810338d4f5085211c7dfa5d5bdd8"
 uuid = "9e997f8a-9a97-42d5-a9f1-ce6bfc15e2c0"
 version = "0.1.4"
+
+[[deps.Clustering]]
+deps = ["Distances", "LinearAlgebra", "NearestNeighbors", "Printf", "Random", "SparseArrays", "Statistics", "StatsBase"]
+git-tree-sha1 = "64df3da1d2a26f4de23871cd1b6482bb68092bd5"
+uuid = "aaaa29a8-35af-508c-8bc3-b662a17a0fe5"
+version = "0.14.3"
 
 [[deps.CodecZlib]]
 deps = ["TranscodingStreams", "Zlib_jll"]
@@ -486,6 +548,12 @@ deps = ["Artifacts", "Libdl"]
 uuid = "e66e0078-7015-5450-92f7-15fbd957f2ae"
 version = "0.5.2+0"
 
+[[deps.Conda]]
+deps = ["Downloads", "JSON", "VersionParsing"]
+git-tree-sha1 = "6e47d11ea2776bc5627421d59cdcc1296c058071"
+uuid = "8f4d0f93-b110-5947-807f-2305c1781a2d"
+version = "1.7.0"
+
 [[deps.Contour]]
 git-tree-sha1 = "d05d9e7b7aedff4e5b51a029dced05cfb6125781"
 uuid = "d38c429a-6771-53c6-b99e-75d170b6e991"
@@ -523,6 +591,12 @@ git-tree-sha1 = "bfc1187b79289637fa0ef6d4436ebdfe6905cbd6"
 uuid = "e2d170a0-9d28-54be-80f0-106bbe20a464"
 version = "1.0.0"
 
+[[deps.DataValues]]
+deps = ["DataValueInterfaces", "Dates"]
+git-tree-sha1 = "d88a19299eba280a6d062e135a43f00323ae70bf"
+uuid = "e7dc6d0d-1eca-5fa6-8ad6-5aecde8b7ea5"
+version = "0.4.13"
+
 [[deps.Dates]]
 deps = ["Printf"]
 uuid = "ade2ca70-3891-5945-98fb-dc099432e06a"
@@ -536,6 +610,16 @@ deps = ["InverseFunctions", "Test"]
 git-tree-sha1 = "80c3e8639e3353e5d2912fb3a1916b8455e2494b"
 uuid = "b429d917-457f-4dbc-8f4c-0cc954292b1d"
 version = "0.4.0"
+
+[[deps.Distances]]
+deps = ["LinearAlgebra", "SparseArrays", "Statistics", "StatsAPI"]
+git-tree-sha1 = "3258d0659f812acde79e8a74b11f17ac06d0ca04"
+uuid = "b4f34e82-e78d-54a5-968a-f98e89d6e8f7"
+version = "0.10.7"
+
+[[deps.Distributed]]
+deps = ["Random", "Serialization", "Sockets"]
+uuid = "8ba89e20-285c-5b6f-9357-94700520ee1b"
 
 [[deps.Distributions]]
 deps = ["ChainRulesCore", "DensityInterface", "FillArrays", "LinearAlgebra", "PDMats", "Printf", "QuadGK", "Random", "SparseArrays", "SpecialFunctions", "Statistics", "StatsBase", "StatsFuns", "Test"]
@@ -577,6 +661,18 @@ deps = ["Artifacts", "Bzip2_jll", "FreeType2_jll", "FriBidi_jll", "JLLWrappers",
 git-tree-sha1 = "74faea50c1d007c85837327f6775bea60b5492dd"
 uuid = "b22a6f82-2f65-5046-a5b2-351ab43fb4e5"
 version = "4.4.2+2"
+
+[[deps.FFTW]]
+deps = ["AbstractFFTs", "FFTW_jll", "LinearAlgebra", "MKL_jll", "Preferences", "Reexport"]
+git-tree-sha1 = "90630efff0894f8142308e334473eba54c433549"
+uuid = "7a1cc6ca-52ef-59f5-83cd-3a7055c09341"
+version = "1.5.0"
+
+[[deps.FFTW_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
+git-tree-sha1 = "c6033cc3892d0ef5bb9cd29b7f2f0331ea5184ea"
+uuid = "f5851436-0d7a-5f13-b9de-f02708fd171a"
+version = "3.3.10+0"
 
 [[deps.FileWatching]]
 uuid = "7b1f6079-737a-58dc-b8bc-7a2ca5c1b5ee"
@@ -691,9 +787,21 @@ git-tree-sha1 = "0cf92ec945125946352f3d46c96976ab972bde6f"
 uuid = "842dd82b-1e85-43dc-bf29-5d0ee9dffc48"
 version = "1.3.2"
 
+[[deps.IntelOpenMP_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
+git-tree-sha1 = "d979e54b71da82f3a65b62553da4fc3d18c9004c"
+uuid = "1d5cc7b8-4909-519e-a0f8-d0f5ad9712d0"
+version = "2018.0.3+2"
+
 [[deps.InteractiveUtils]]
 deps = ["Markdown"]
 uuid = "b77e0a4c-d291-57a0-90e8-8db25a27a240"
+
+[[deps.Interpolations]]
+deps = ["Adapt", "AxisAlgorithms", "ChainRulesCore", "LinearAlgebra", "OffsetArrays", "Random", "Ratios", "Requires", "SharedArrays", "SparseArrays", "StaticArrays", "WoodburyMatrices"]
+git-tree-sha1 = "721ec2cf720536ad005cb38f50dbba7b02419a15"
+uuid = "a98d9a8b-a2ab-59e6-89dd-64a1c18fca59"
+version = "0.14.7"
 
 [[deps.InverseFunctions]]
 deps = ["Test"]
@@ -740,6 +848,12 @@ git-tree-sha1 = "b53380851c6e6664204efb2e62cd24fa5c47e4ba"
 uuid = "aacddb02-875f-59d6-b918-886e6ef4fbf8"
 version = "2.1.2+0"
 
+[[deps.KernelDensity]]
+deps = ["Distributions", "DocStringExtensions", "FFTW", "Interpolations", "StatsBase"]
+git-tree-sha1 = "9816b296736292a80b9a3200eb7fbb57aaa3917a"
+uuid = "5ab0869b-81aa-558d-bb23-cbf5423bbe9b"
+version = "0.6.5"
+
 [[deps.LAME_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
 git-tree-sha1 = "f6250b16881adf048549549fba48b1161acdac8c"
@@ -768,6 +882,10 @@ deps = ["Formatting", "InteractiveUtils", "LaTeXStrings", "MacroTools", "Markdow
 git-tree-sha1 = "2422f47b34d4b127720a18f86fa7b1aa2e141f29"
 uuid = "23fbe1c1-3f47-55db-b15f-69d7ec21a316"
 version = "0.15.18"
+
+[[deps.LazyArtifacts]]
+deps = ["Artifacts", "Pkg"]
+uuid = "4af54fe1-eca0-43a8-85a7-787d91b784e3"
 
 [[deps.LibCURL]]
 deps = ["LibCURL_jll", "MozillaCACerts_jll"]
@@ -858,6 +976,12 @@ git-tree-sha1 = "cedb76b37bc5a6c702ade66be44f831fa23c681e"
 uuid = "e6f89c97-d47a-5376-807f-9c37f3926c36"
 version = "1.0.0"
 
+[[deps.MKL_jll]]
+deps = ["Artifacts", "IntelOpenMP_jll", "JLLWrappers", "LazyArtifacts", "Libdl", "Pkg"]
+git-tree-sha1 = "2ce8695e1e699b68702c03402672a69f54b8aca9"
+uuid = "856f044c-d86e-5d09-b602-aeab76dc8ba7"
+version = "2022.2.0+0"
+
 [[deps.MacroTools]]
 deps = ["Markdown", "Random"]
 git-tree-sha1 = "42324d08725e200c23d4dfb549e0d5d89dede2d2"
@@ -897,15 +1021,38 @@ uuid = "a63ad114-7e13-5084-954f-fe012c677804"
 uuid = "14a3606d-f60d-562e-9121-12d972cd8159"
 version = "2022.2.1"
 
+[[deps.MultivariateStats]]
+deps = ["Arpack", "LinearAlgebra", "SparseArrays", "Statistics", "StatsAPI", "StatsBase"]
+git-tree-sha1 = "efe9c8ecab7a6311d4b91568bd6c88897822fabe"
+uuid = "6f286f6a-111f-5878-ab1e-185364afe411"
+version = "0.10.0"
+
 [[deps.NaNMath]]
 deps = ["OpenLibm_jll"]
 git-tree-sha1 = "a7c3d1da1189a1c2fe843a3bfa04d18d20eb3211"
 uuid = "77ba4419-2d1f-58cd-9bb1-8ffee604a2e3"
 version = "1.0.1"
 
+[[deps.NearestNeighbors]]
+deps = ["Distances", "StaticArrays"]
+git-tree-sha1 = "2c3726ceb3388917602169bed973dbc97f1b51a8"
+uuid = "b8a86587-4115-5ab1-83bc-aa920d37bbce"
+version = "0.4.13"
+
 [[deps.NetworkOptions]]
 uuid = "ca575930-c2e3-43a9-ace4-1e988b2c1908"
 version = "1.2.0"
+
+[[deps.Observables]]
+git-tree-sha1 = "6862738f9796b3edc1c09d0890afce4eca9e7e93"
+uuid = "510215fc-4207-5dde-b226-833fc4488ee2"
+version = "0.5.4"
+
+[[deps.OffsetArrays]]
+deps = ["Adapt"]
+git-tree-sha1 = "f71d8950b724e9ff6110fc948dff5a329f901d64"
+uuid = "6fe1bfb0-de20-5000-8ca7-80f57d26f881"
+version = "1.12.8"
 
 [[deps.Ogg_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
@@ -1025,6 +1172,24 @@ version = "2.2.2"
 deps = ["Unicode"]
 uuid = "de0858da-6303-5e67-8744-51eddeeeb8d7"
 
+[[deps.ProgressLogging]]
+deps = ["Logging", "SHA", "UUIDs"]
+git-tree-sha1 = "80d919dee55b9c50e8d9e2da5eeafff3fe58b539"
+uuid = "33c8b6b6-d38a-422a-b730-caa89a2f386c"
+version = "0.1.4"
+
+[[deps.PyCall]]
+deps = ["Conda", "Dates", "Libdl", "LinearAlgebra", "MacroTools", "Serialization", "VersionParsing"]
+git-tree-sha1 = "62f417f6ad727987c755549e9cd88c46578da562"
+uuid = "438e738f-606a-5dbb-bf0a-cddfbfd45ab0"
+version = "1.95.1"
+
+[[deps.PyPlot]]
+deps = ["Colors", "LaTeXStrings", "PyCall", "Sockets", "Test", "VersionParsing"]
+git-tree-sha1 = "f9d953684d4d21e947cb6d642db18853d43cb027"
+uuid = "d330b81b-6aea-500a-939a-2ce795aea3ee"
+version = "2.11.0"
+
 [[deps.Qt5Base_jll]]
 deps = ["Artifacts", "CompilerSupportLibraries_jll", "Fontconfig_jll", "Glib_jll", "JLLWrappers", "Libdl", "Libglvnd_jll", "OpenSSL_jll", "Pkg", "Xorg_libXext_jll", "Xorg_libxcb_jll", "Xorg_xcb_util_image_jll", "Xorg_xcb_util_keysyms_jll", "Xorg_xcb_util_renderutil_jll", "Xorg_xcb_util_wm_jll", "Zlib_jll", "xkbcommon_jll"]
 git-tree-sha1 = "0c03844e2231e12fda4d0086fd7cbe4098ee8dc5"
@@ -1044,6 +1209,12 @@ uuid = "3fa0cd96-eef1-5676-8a61-b3b8758bbffb"
 [[deps.Random]]
 deps = ["SHA", "Serialization"]
 uuid = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
+
+[[deps.Ratios]]
+deps = ["Requires"]
+git-tree-sha1 = "dc84268fe0e3335a62e315a3a7cf2afa7178a734"
+uuid = "c84ed2f1-dad5-54f0-aa8e-dbefe2724439"
+version = "0.4.3"
 
 [[deps.RecipesBase]]
 deps = ["SnoopPrecompile"]
@@ -1108,8 +1279,18 @@ git-tree-sha1 = "f94f779c94e58bf9ea243e77a37e16d9de9126bd"
 uuid = "6c6a2e73-6563-6170-7368-637461726353"
 version = "1.1.1"
 
+[[deps.SentinelArrays]]
+deps = ["Dates", "Random"]
+git-tree-sha1 = "c02bd3c9c3fc8463d3591a62a378f90d2d8ab0f3"
+uuid = "91c51154-3ec4-41a3-a24f-3f23e20d615c"
+version = "1.3.17"
+
 [[deps.Serialization]]
 uuid = "9e88b42a-f829-5b0c-bbe9-9e923198166b"
+
+[[deps.SharedArrays]]
+deps = ["Distributed", "Mmap", "Random", "Serialization"]
+uuid = "1a1011a3-84de-559e-8e89-a11a2f7dc383"
 
 [[deps.Showoff]]
 deps = ["Dates", "Grisu"]
@@ -1147,6 +1328,17 @@ git-tree-sha1 = "d75bda01f8c31ebb72df80a46c88b25d1c79c56d"
 uuid = "276daf66-3868-5448-9aa4-cd146d93841b"
 version = "2.1.7"
 
+[[deps.StaticArrays]]
+deps = ["LinearAlgebra", "Random", "StaticArraysCore", "Statistics"]
+git-tree-sha1 = "6954a456979f23d05085727adb17c4551c19ecd1"
+uuid = "90137ffa-7385-5640-81b9-e52037218182"
+version = "1.5.12"
+
+[[deps.StaticArraysCore]]
+git-tree-sha1 = "6b7ba252635a5eff6a0b0664a41ee140a1c9e72a"
+uuid = "1e83bf80-4336-4d27-bf5d-d5a4f845583c"
+version = "1.4.0"
+
 [[deps.Statistics]]
 deps = ["LinearAlgebra", "SparseArrays"]
 uuid = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
@@ -1169,6 +1361,12 @@ git-tree-sha1 = "ab6083f09b3e617e34a956b43e9d51b824206932"
 uuid = "4c63d2b9-4356-54db-8cca-17b64c39e42c"
 version = "1.1.1"
 
+[[deps.StatsPlots]]
+deps = ["AbstractFFTs", "Clustering", "DataStructures", "DataValues", "Distributions", "Interpolations", "KernelDensity", "LinearAlgebra", "MultivariateStats", "NaNMath", "Observables", "Plots", "RecipesBase", "RecipesPipeline", "Reexport", "StatsBase", "TableOperations", "Tables", "Widgets"]
+git-tree-sha1 = "e0d5bc26226ab1b7648278169858adcfbd861780"
+uuid = "f3b207a7-027a-5e70-b257-86293d7955fd"
+version = "0.15.4"
+
 [[deps.StringManipulation]]
 git-tree-sha1 = "46da2434b41f41ac3594ee9816ce5541c6096123"
 uuid = "892a3eda-7b42-436c-8928-eab12a02cf0e"
@@ -1182,6 +1380,12 @@ uuid = "4607b0f0-06f3-5cda-b6b1-a6196a1729e9"
 deps = ["Dates"]
 uuid = "fa267f1f-6049-4f14-aa54-33bafae1ed76"
 version = "1.0.0"
+
+[[deps.TableOperations]]
+deps = ["SentinelArrays", "Tables", "Test"]
+git-tree-sha1 = "e383c87cf2a1dc41fa30c093b2a19877c83e1bc1"
+uuid = "ab02a1b2-a7df-11e8-156e-fb1833f50b87"
+version = "1.2.0"
 
 [[deps.TableTraits]]
 deps = ["IteratorInterfaceExtensions"]
@@ -1198,7 +1402,7 @@ version = "1.10.0"
 [[deps.Tar]]
 deps = ["ArgTools", "SHA"]
 uuid = "a4e569a6-e804-4fa4-b0f3-eef7a1d5b13e"
-version = "1.10.1"
+version = "1.10.0"
 
 [[deps.TensorCore]]
 deps = ["LinearAlgebra"]
@@ -1239,6 +1443,11 @@ git-tree-sha1 = "ca0969166a028236229f63514992fc073799bb78"
 uuid = "41fe7b60-77ed-43a1-b4f0-825fd5a5650d"
 version = "0.2.0"
 
+[[deps.VersionParsing]]
+git-tree-sha1 = "58d6e80b4ee071f5efd07fda82cb9fbe17200868"
+uuid = "81def892-9a0e-5fdd-b105-ffc91e053289"
+version = "1.3.0"
+
 [[deps.Wayland_jll]]
 deps = ["Artifacts", "Expat_jll", "JLLWrappers", "Libdl", "Libffi_jll", "Pkg", "XML2_jll"]
 git-tree-sha1 = "ed8d92d9774b077c53e1da50fd81a36af3744c1c"
@@ -1256,6 +1465,18 @@ deps = ["DataAPI", "InlineStrings", "Parsers"]
 git-tree-sha1 = "b1be2855ed9ed8eac54e5caff2afcdb442d52c23"
 uuid = "ea10d353-3f73-51f8-a26c-33c1cb351aa5"
 version = "1.4.2"
+
+[[deps.Widgets]]
+deps = ["Colors", "Dates", "Observables", "OrderedCollections"]
+git-tree-sha1 = "fcdae142c1cfc7d89de2d11e08721d0f2f86c98a"
+uuid = "cc8bc4a8-27d6-5769-a93b-9d913e69aa62"
+version = "0.6.6"
+
+[[deps.WoodburyMatrices]]
+deps = ["LinearAlgebra", "SparseArrays"]
+git-tree-sha1 = "de67fa59e33ad156a590055375a30b23c40299d3"
+uuid = "efce3f68-66dc-5838-9240-27a6d6f5f9b6"
+version = "0.5.5"
 
 [[deps.XML2_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Libiconv_jll", "Pkg", "Zlib_jll"]
@@ -1477,9 +1698,9 @@ version = "1.4.1+0"
 """
 
 # ╔═╡ Cell order:
-# ╠═48eee69f-1ae2-438c-8816-d76aea8f85a4
+# ╟─48eee69f-1ae2-438c-8816-d76aea8f85a4
 # ╟─4951c40d-e08c-48f5-a364-63a76a00133a
-# ╟─4a54a800-990d-11ed-31f8-ff5066c0c38e
+# ╠═4a54a800-990d-11ed-31f8-ff5066c0c38e
 # ╟─5a710a7d-4687-4df7-a9d9-c9c828c9afab
 # ╟─6e655d43-9611-4a9d-8ccb-fe92d6bea6c3
 # ╟─2aa72e33-48f3-4604-9888-eb426f3450c6
@@ -1489,7 +1710,7 @@ version = "1.4.1+0"
 # ╟─a330541c-f668-4e6d-b2ea-4378be5446d9
 # ╟─61b3023b-4e9e-42e9-ad66-ce029af65b70
 # ╟─7638877a-9be3-4d22-a8fd-e14626f43d6d
-# ╠═08a22f71-628b-479c-81e9-69206f6496a0
+# ╟─08a22f71-628b-479c-81e9-69206f6496a0
 # ╟─b050c890-0597-4d07-add4-4160880becce
 # ╟─4029d6bf-87ed-4b95-a2db-25762b2a3cfb
 # ╟─071091ef-0ecc-4c66-8483-12f12dc8a342
@@ -1498,5 +1719,6 @@ version = "1.4.1+0"
 # ╟─70699a58-9666-446a-899e-4af79b3ea3d1
 # ╟─7926d70f-f960-41e1-b1d4-79b293e0ba89
 # ╟─d7a129c2-2c7b-4e01-b850-66f3ec784d2a
+# ╠═6b5b485d-6838-4f72-a1b3-16890d4c1984
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002

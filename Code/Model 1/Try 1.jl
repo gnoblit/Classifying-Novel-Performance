@@ -237,7 +237,9 @@ function run(gens, N, minorityCost, randomSeq, propPref, binomialBeliefs, tableN
     end
     return df
 end
-df = run(1000, 40, .7, false, [.3, .5, .2], true, nothing)
+
+df1 = run(1000, 40, .7, false, [.3, .5, .2], true, nothing)
+df2 = run(1000, 40, 1.7, false, [.3, .5, .2], true, nothing)
 
 # society = init(20, .8, false, [.3, .4, .3], false)
 # test = iterate!(society)
@@ -268,7 +270,7 @@ df = run(1000, 40, .7, false, [.3, .5, .2], true, nothing)
     Function groups into outcomes (if alpha > beta, majority is ACCEPT else majority is REJECT)
     In conditional plots, function also shows the average belief an individual at that position in the sequence must have to make an accept or reject decision. This is found by calculating c(1-2p) for each agent, the threshold that must be exceeded to state ACCEPT publicly. It then plots a distribution of U_AA^i-c(1-2p^i) where U_AA^i is the ith agent's utility to ACCEPT conditional on the group accepting and p^i is there belief the these for a sample of agents at that position in the sequence.
 """
-function plotting_function(df; useralpha = .3, proportion = .01, marginalproportion = true)
+function plotting_function(df; useralpha = .3, proportion = .05, marginalproportion = true)
     # Take in data frame where each row is a universe/society, agent tuple. 
     # Get community size, N
     N = DataFrames.nrow(filter(x -> x.Gen == 1, df))
@@ -411,12 +413,19 @@ function plotting_function(df; useralpha = .3, proportion = .01, marginalproport
     df.OutcomeColor.= ifelse.(df.FinalOutcome .== 1, "blue", "red")
 
     pyplot()
-    plot2 = groupedboxplot(df.SeqPosition, df.Threshold.-df.BeliefAccept, group = df.OutcomeString, color = [:red :blue], title = "Distribution of Threshold Beliefs - Actual Beliefs")
-    
+    GroupedBoxPlot = groupedboxplot(df.SeqPosition, df.Threshold.-df.BeliefAccept, group = df.OutcomeString, color = [:red :blue], title = "Distribution of Threshold Beliefs - Actual Beliefs")
+    MarginalViolinPlot = violin(df.SeqPosition, df.Threshold .- df.BeliefAccept, title = "Average Distribution of Threshold Beliefs - Actual Beliefs")
     # plot(beliefsAverage.Accepts_thresholdAverage, color = :blue, linestyle = :dash, linewidth = 3, label = "Average Threshold for Accepts")
     # plot!(beliefsAverage.Rejects_thresholdAverage, color = :red, linestyle = :dash, linewidth = 3, label = "Average Threshold for Rejects")
     # plot!(beliefsAverage.Accepts_beliefAverage, color = :blue, linewidth = 3, label = "Average Beliefs for Accepts") 
     # # Plot sequence of marginal accept average beliefs for REJECT outcome 
     # plot!(beliefsAverage.Rejects_beliefAverage, color = :red, linewidth = 3, label = "Average Beliefs for Rejects") 
-    return (AvgCondPlot, plot2)
+    return (AvgCondPlot, GroupedBoxPlot, MarginalViolinPlot)
 end
+
+plotting_function(df1)[1]
+plotting_function(df1)[2]
+plotting_function(df1)[3]
+plotting_function(df2)[1]
+plotting_function(df2)[2]
+plotting_function(df2)[3]
